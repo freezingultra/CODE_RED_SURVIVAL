@@ -228,6 +228,36 @@
     }
   };
 
+  // Player Counter
+  const PlayerCounter = {
+    key: "codered-players",
+    load() {
+      try {
+        const data = localStorage.getItem(this.key);
+        return data ? JSON.parse(data) : { count: 0, usernames: [] };
+      } catch (e) {
+        return { count: 0, usernames: [] };
+      }
+    },
+    save(data) {
+      try {
+        localStorage.setItem(this.key, JSON.stringify(data));
+      } catch (e) {}
+    },
+    addPlayer(username) {
+      const data = this.load();
+      if (!data.usernames.includes(username)) {
+        data.usernames.push(username);
+        data.count = data.usernames.length; // Count is the number of unique usernames
+        this.save(data);
+      }
+      return data.count;
+    },
+    getCount() {
+      return this.load().count;
+    }
+  };
+
   // Input
   const Input = {
     keys: {}, mouse: { x: 0, y: 0, down: false },
@@ -1054,7 +1084,7 @@
         const mins = Math.floor(timeLeft / 60);
         const secs = Math.floor(timeLeft % 60).toString().padStart(2, '0');
         ctx.fillText("Time: " + mins + ":" + secs, w / 2 - 50, 30);
-        
+        ctx.fillText("Players: " + PlayerCounter.getCount(), w - 150, 30);
       } else {
         ctx.save();
         ctx.translate(-this.camera.x, -this.camera.y);
@@ -1069,6 +1099,7 @@
           const secs = Math.floor(timeLeft % 60).toString().padStart(2, '0');
           ctx.fillText("Wave " + this.wave + " Time: " + mins + ":" + secs, this.canvas.width / 2 - 100, 30);
         }
+        ctx.fillText("Players: " + PlayerCounter.getCount(), this.canvas.width - 150, 30);
       }
       this.drawMinimap(ctx);
     }
@@ -1290,8 +1321,10 @@
         window.game.world.isLoggedIn = true;
         window.game.world.userName = name;
         localStorage.setItem("codered-user", name);
+        PlayerCounter.addPlayer(name);
         UI.showToast("Logged in as " + name);
         this.loginBtn.textContent = "Logout";
+        UI.updateHUD(window.game.world);
       }
     },
 
