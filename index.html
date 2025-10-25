@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- ✅ SEO & Search Visibility -->
+  <meta name="robots" content="index, follow">
+  <meta name="description" content="Play Code Red: Survival - a fast-paced top-down survival shooter where you battle waves of enemies inside eerie backrooms mazes. Upgrade weapons, defeat bosses, and survive as long as possible.">
+  <meta name="keywords" content="Code Red Survival, topdown shooter, survival game, browser shooter, HTML5 game, indie game, action shooter, maze survival, free web game">
+
+  <!-- ✅ Open Graph (social media sharing) -->
+  <meta property="og:title" content="Code Red: Survival">
+  <meta property="og:description" content="Fight waves of enemies in the Backrooms in this intense top-down shooter. Collect coins, upgrade your weapons, and survive!">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://code-red-survival.onrender.com/">
+  <meta property="og:image" content="https://code-red-survival.onrender.com/thumbnail.jpg">
+
+  <!-- ✅ Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Code Red: Survival - Backrooms Edition">
+  <meta name="twitter:description" content="Fast-paced top-down survival shooter set in the mysterious Backrooms.">
+  <meta name="twitter:image" content="https://code-red-survival.onrender.com/thumbnail.jpg">
+
+  <!-- ✅ Google Sign-In -->
+  <meta name="google-signin-client_id" content="YOUR_CLIENT_ID.apps.googleusercontent.com">
+  <script src="https://apis.google.com/js/platform.js" async defer></script>
+
+  <title>Code Red: Survival - Backrooms Edition</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Arial', sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      overflow: hidden;
+    }
+    
+    #game {
+      display: block;
+      background: #000;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+      outline: none;
+    }
+    
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .dialog {
+      background: #1a1a1a;
+      border: 2px solid #00d9ff;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 600px;
+      text-align: center;
+      box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);
+    }
+    
+    h1 {
+      color: #00d9ff;
+      font-size: 42px;
+      margin-bottom: 10px;
+      text-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+    }
+    
+    h2 {
+      color: #00d9ff;
+      font-size: 28px;
+      margin-bottom: 15px;
+    }
+    
+    p {
+      color: #aaa;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #00d9ff, #0099cc);
+      color: #000;
+      border: none;
+      padding: 12px 30px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 5px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(0, 217, 255, 0.3);
+    }
+    
+    button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0, 217, 255, 0.5);
+    }
+    
+    button:active {
+      transform: translateY(-1px);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .difficulty-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 20px 0;
+    }
+    
+    .difficulty-btn {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 2px solid transparent;
+      transition: all 0.3s;
+    }
+    
+    .difficulty-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(0, 217, 255, 0.5);
+    }
+    
+    .difficulty-btn.active {
+      border-color: #00d9ff;
+      background: rgba(0, 217, 255, 0.25);
+      box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
+    }
+    
+    .hud {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 900;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 12px;
+      border: 2px solid #00d9ff;
+      min-width: 220px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+    }
+    
+    .hud-item {
+      margin: 10px 0;
+      font-size: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .hud-item strong {
+      color: #00d9ff;
+    }
+    
+    .health-bar {
+      width: 100%;
+      height: 22px;
+      background: #222;
+      border-radius: 11px;
+      overflow: hidden;
+      margin-top: 5px;
+      border: 1px solid #444;
+    }
+    
+    .health-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff3366 0%, #ffaa00 50%, #00ff88 100%);
+      transition: width 0.3s;
+      box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3);
+    }
+    
+    .wave-display {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      padding: 15px 30px;
+      border-radius: 12px;
+      border: 2px solid #00d9ff;
+      font-size: 28px;
+      font-weight: bold;
+      color: #00d9ff;
+      z-index: 900;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 25px rgba(0, 217, 255, 0.4);
+      text-shadow: 0 0 10px rgba(0, 217, 255, 0.8);
+    }
+    
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: rgba(0, 0, 0, 0.95);
+      border: 2px solid #00d9ff;
+      padding: 15px 25px;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 16px;
+      z-index: 10000;
+      opacity: 0;
+      transition: all 0.3s;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+    }
+    
+    .toast.show {
+      opacity: 1;
+      transform: translateY(-10px);
+    }
+
+    .loading-bar {
+      width: 320px;
+      height: 10px;
+      background: #222;
+      border-radius: 5px;
+      overflow: hidden;
+      margin: 20px auto;
+      border: 1px solid #444;
+    }
+
+    .loading-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00d9ff, #0099cc);
+      width: 0%;
+      transition: width 0.3s;
+      box-shadow: 0 0 15px rgba(0, 217, 255, 0.8);
+    }
+
+    .shop-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin: 20px 0;
+      max-width: 850px;
+    }
+
+    .shop-category {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 217, 255, 0.2);
+    }
+
+    .shop-category h3 {
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    .shop-item {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 10px;
+      transition: all 0.3s;
+    }
+
+    .shop-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(0, 217, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .shop-item h4 {
+      color: #00d9ff;
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .shop-item p {
+      font-size: 13px;
+      margin-bottom: 10px;
+      color: #ccc;
+    }
+
+    .shop-item button {
+      width: 100%;
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    .tutorial-content {
+      text-align: left;
+      max-height: 450px;
+      overflow-y: auto;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+
+    .tutorial-content h3 {
+      color: #00d9ff;
+      margin-top: 15px;
+      margin-bottom: 10px;
+      font-size: 20px;
+    }
+
+    .tutorial-content ul {
+      margin-left: 25px;
+      margin-bottom: 15px;
+    }
+
+    .tutorial-content li {
+      margin: 8px 0;
+      color: #ddd;
+      line-height: 1.6;
+    }
+
+    .stats-display {
+      margin-top: 25px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(0, 217, 255, 0.3);
+      display: flex;
+      justify-content: space-around;
+      font-size: 15px;
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-label {
+      color: #888;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      color: #00d9ff;
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+    .tutorial-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .tutorial-content::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+    }
+
+    .tutorial-content::-webkit-scrollbar-thumb {
+      background: rgba(0, 217, 255, 0.5);
+      border-radius: 4px;
+    }
+
+    .tutorial-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 217, 255, 0.7);
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="game"></canvas>
+  
+  <div class="wave-display">WAVE <span id="waveNumber">0</span></div>
+  
+  <div class="hud">
+    <div class="hud-item">
+      <strong>❤️ HEALTH</strong>
+      <div class="health-bar">
+        <div id="healthBar" class="health-fill" style="width: 100%;"></div>
+      </div>
+    </div>
+    <div class="hud-item" id="armorDisplay" style="display: none;">
+      <strong>🛡️ ARMOR</strong>
+      <div class="health-bar" style="background: #333;">
+        <div id="armorBar" class="health-fill" style="background: linear-gradient(90deg, #666, #999); width: 0%;"></div>
+      </div>
+    </div>
+    <div class="hud-item">
+      <span>🪙 <strong>Coins</strong></span>
+      <span id="coinCount" style="color: #ffdd00; font-weight: bold;">0</span>
+    </div>
+    <div class="hud-item">
+      <span>💎 <strong>Gems</strong></span>
+      <span id="gemCount" style="color: #00ff88; font-weight: bold;">0</span>
+    </div>
+    <div class="hud-item">
+      <span>🔫 <strong>Weapon</strong></span>
+      <span id="currentWeapon" style="color: #ff6600; font-weight: bold;">Pistol</span>
+    </div>
+  </div>
+  
+  <div id="homeScreen" class="overlay">
+    <div class="dialog">
+      <h1>⚠️ CODE RED ⚠️</h1>
+      <h2>SURVIVAL</h2>
+      <p style="color: #00d9ff; font-size: 16px;">Backrooms Edition</p>
+      
+      <h3 style="color: #00d9ff; margin-top: 25px; margin-bottom: 15px;">🎯 Select Difficulty</h3>
+      <div class="difficulty-buttons">
+        <button class="difficulty-btn" data-difficulty="Easy">😊 Easy</button>
+        <button class="difficulty-btn active" data-difficulty="Normal">😐 Normal</button>
+        <button class="difficulty-btn" data-difficulty="Hard">😰 Hard</button>
+        <button class="difficulty-btn" data-difficulty="Nightmare">💀 Nightmare</button>
+      </div>
+      
+      <div style="margin: 25px 0;">
+        <button id="startGameBtn" style="font-size: 18px; padding: 15px 40px;">🎮 START GAME</button>
+        <button id="tutorialBtn">📖 Tutorial</button>
+      </div>
+      
+      <div class="stats-display">
+        <div class="stat-item">
+          <div class="stat-label">Best Wave</div>
+          <div class="stat-value" id="bestWaveHome">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Total Coins</div>
+          <div class="stat-value" id="totalCoinsHome" style="color: #ffdd00;">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="tutorialScreen" class="overlay" style="display: none;">
+    <div class="dialog" style="max-width: 750px;">
+      <h2>🛡️ How to Survive</h2>
+      <div class="tutorial-content">
+        <h3>🎮 Controls</h3>
+        <ul>
+          <li><strong>W/A/S/D</strong> or <strong>Arrow Keys</strong> - Move through the maze</li>
+          <li><strong>Mouse</strong> - Aim your weapon</li>
+          <li><strong>Left Click</strong> or <strong>Spacebar</strong> - Shoot</li>
+          <li><strong>Q</strong> - Switch between unlocked weapons</li>
+          <li><strong>F</strong> - Open shop (spend coins on upgrades!)</li>
+          <li><strong>Shift</strong> - Sprint (40% faster movement)</li>
+          <li><strong>P</strong> - Pause game</li>
+        </ul>
+        
+        <h3>🎯 How to Play</h3>
+        <ul>
+          <li>Navigate through procedurally generated backrooms-style mazes</li>
+          <li>Press <strong>SPACE</strong> to start each wave</li>
+          <li>Survive against increasingly difficult waves of enemies</li>
+          <li>Collect coins (🪙) and gems (💎) dropped by defeated enemies</li>
+          <li>Press <strong>F</strong> to open the shop and buy powerful upgrades</li>
+          <li>Unlock new weapons and build your perfect loadout</li>
+          <li>Boss waves appear every 10 waves - prepare for battle!</li>
+        </ul>
+        
+        <h3>👾 Enemy Types</h3>
+        <ul>
+          <li><strong style="color: #ff3366;">Basic (Red)</strong> - Standard enemy, chases you directly</li>
+          <li><strong style="color: #ff6633;">Ranged (Orange)</strong> - Keeps distance and shoots projectiles</li>
+          <li><strong style="color: #ff33ff;">Fast (Purple)</strong> - 50% faster movement speed</li>
+          <li><strong style="color: #ff9900;">Suicide (Yellow)</strong> - Rushes you and explodes on contact (18 damage!)</li>
+          <li><strong style="color: #aa0000;">Boss (Dark Red)</strong> - Appears every 10 waves, fires 6-way bullet spread</li>
+        </ul>
+        
+        <h3>🔫 Weapons</h3>
+        <ul>
+          <li><strong>Pistol</strong> - 18 damage, 0.22s cooldown, accurate (unlocked by default)</li>
+          <li><strong>Shotgun</strong> - 10 damage × 5 pellets, 0.85s cooldown, wide spread (150 coins)</li>
+          <li><strong>Burst Rifle</strong> - 12 damage × 3 bullets, 0.45s cooldown, medium spread (200 coins)</li>
+        </ul>
+        
+        <h3>💡 Pro Tips</h3>
+        <ul>
+          <li><strong>Use walls as cover</strong> - Ranged enemies can't shoot through walls</li>
+          <li><strong>Check the minimap</strong> - Bottom right shows walls, enemies, and your position</li>
+          <li><strong>Upgrade early</strong> - Max HP and armor are crucial for later waves</li>
+          <li><strong>Don't get cornered</strong> - Always leave yourself an escape route</li>
+          <li><strong>Manage spawns</strong> - Enemies spawn slowly (every 5 seconds), max 15 at once</li>
+          <li><strong>Sprint strategically</strong> - Hold Shift to move 40% faster</li>
+          <li><strong>Boss strategy</strong> - Use corridors to funnel bosses and dodge their attacks</li>
+        </ul>
+      </div>
+      <div style="margin-top: 20px;">
+        <button id="tutorialBackBtn">← Back</button>
+        <button id="tutorialStartBtn" style="font-size: 18px; padding: 12px 35px;">🎮 START PLAYING!</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="pauseScreen" class="overlay" style="display: none;">
+    <div class="dialog">
+      <h2>⏸️ Paused</h2>
+      <p>Take a breather, the backrooms can wait...</p>
+      <button id="resumeBtn" style="font-size: 18px; padding: 12px 30px;">▶️ Resume</button>
+      <button id="mainMenuBtn">🏠 Main Menu</button>
+    </div>
+  </div>
+  
+  <div id="gameOverScreen" class="overlay" style="display: none;">
+    <div class="dialog">
+      <h2 style="color: #ff3366;">💀 GAME OVER 💀</h2>
+      <p style="color: #ccc;">You didn't make it out of the backrooms...</p>
+      <div style="margin: 25px 0; font-size: 18px;">
+        <div style="margin: 12px 0; padding: 10px; background: rgba(0,217,255,0.1); border-radius: 8px;">
+          <strong style="color: #888;">Wave Reached:</strong> 
+          <span id="finalWave" style="color: #00d9ff; font-weight: bold; font-size: 24px;">0</span>
+        </div>
+        <div style="margin: 12px 0; padding: 10px; background: rgba(255,51,102,0.1); border-radius: 8px;">
+          <strong style="color: #888;">Enemies Defeated:</strong> 
+          <span id="finalKills" style="color: #ff3366; font-weight: bold; font-size: 24px;">0</span>
+        </div>
+        <div style="margin: 12px 0; padding: 10px; background: rgba(255,221,0,0.1); border-radius: 8px;">
+          <strong style="color: #888;">Coins Earned:</strong> 
+          <span id="finalCoins" style="color: #ffdd00; font-weight: bold; font-size: 24px;">0</span>
+        </div>
+      </div>
+      <button id="restartBtn" style="font-size: 18px; padding: 12px 30px;">🔄 Play Again</button>
+      <button id="gameOverMenuBtn">🏠 Main Menu</button>
+    </div>
+  </div>
+  
+  <div id="shopScreen" class="overlay" style="display: none;">
+    <div class="dialog" style="max-width: 950px;">
+      <h2>🛒 Shop & Upgrades</h2>
+      <p style="font-size: 20px;">Your Coins: <span id="shopCoins" style="color: #ffdd00; font-weight: bold; font-size: 24px;">0</span> 🪙</p>
+      
+      <div class="shop-grid">
+        <div class="shop-category">
+          <h3 style="color: #ff6600;">⚔️ OFFENSE</h3>
+          <div id="offenseUpgrades"></div>
+        </div>
+        <div class="shop-category">
+          <h3 style="color: #00ff88;">🛡️ DEFENSE</h3>
+          <div id="defenseUpgrades"></div>
+        </div>
+        <div class="shop-category">
+          <h3 style="color: #ffdd00;">🔧 UTILITY</h3>
+          <div id="utilityUpgrades"></div>
+        </div>
+      </div>
+      
+      <button id="shopCloseBtn" style="margin-top: 20px; font-size: 16px; padding: 10px 25px;">✖️ Close Shop</button>
+    </div>
+  </div>
+  
+  <div id="toast" class="toast"></div>
+  
+  <div id="loadingScreen" class="overlay">
+    <div class="dialog">
+      <h2>🎮 Loading Game...</h2>
+      <div class="loading-bar">
+        <div id="loadingProgress" class="loading-fill"></div>
+      </div>
+      <p id="loadingText" style="color: #00d9ff; font-size: 18px; font-weight: bold;">0%</p>
+      <p style="font-size: 14px; color: #888; margin-top: 10px;">Generating backrooms maze...</p>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
