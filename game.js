@@ -231,7 +231,7 @@
 
   // Global Leaderboard with Supabase
   const Leaderboard = {
-    tableName: 'Leaderboard',
+    tableName: 'Lederboard',
     
     async ensureTable() {
       if (!supabase) return false;
