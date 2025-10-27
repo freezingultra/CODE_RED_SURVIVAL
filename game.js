@@ -1,6 +1,17 @@
-// game.js - Code Red: Survival - COMPLETE WITH ALL ENEMY TYPES & DAMAGE FIX
+// game.js - Code Red: Survival - COMPLETE WITH GLOBAL LEADERBOARD
 (function() {
   "use strict";
+
+  // Initialize Supabase
+  const SUPABASE_URL = 'https://fkbnpjbbiijlprdhjnad.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrYm5wamJiaWlqbHByZGhqbmFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE0ODI0NTQsImV4cCI6MjA3NzA1ODQ1NH0.a_qtutu3Lnbr4CIu_21gpqofiOjF_ihuaUE782weutk';
+  const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+  
+  if (!supabase) {
+    console.warn('[GAME] Supabase not available, leaderboard features may be limited');
+  } else {
+    console.info('[GAME] Supabase initialized successfully');
+  }
 
   const CONFIG = {
     tileSize: 32,
@@ -29,6 +40,7 @@
       this.history = [];
       this.historyIndex = -1;
       this.commands = new Map();
+      this.cheatsUsed = false;
       this.setupCommands();
       this.createConsoleUI();
     }
@@ -101,6 +113,10 @@
 
       if (this.commands.has(cmd)) {
         try {
+          this.cheatsUsed = true;
+          if (window.game && window.game.world) {
+            window.game.world.cheatsUsed = true;
+          }
           const result = this.commands.get(cmd)(args);
           if (result) this.log(result);
         } catch (error) {
@@ -113,7 +129,7 @@
 
     setupCommands() {
       this.commands.set('help', () => {
-        this.log('Commands: spawn <type> [count], clear, heal, coins <amount>');
+        this.log('Commands: spawn <type> [count], clear, heal, coins <amount>, skip');
         return null;
       });
 
@@ -145,6 +161,13 @@
         const amount = parseInt(args[0]) || 100;
         window.game.world.player.coins += amount;
         return 'Added ' + amount + ' coins';
+      });
+
+      this.commands.set('skip', () => {
+        if (!window.game || !window.game.world) return 'Game not ready';
+        if (!window.game.world.isRunning) return 'No wave active';
+        window.game.world.endWave();
+        return 'Skipped to next wave';
       });
     }
 
@@ -206,25 +229,128 @@
     }
   };
 
-  // Local Leaderboard
+  // Global Leaderboard with Supabase
   const Leaderboard = {
-    key: "codered-leaderboard",
-    load() {
+    tableName: 'Leaderboard',
+    
+    async ensureTable() {
+      if (!supabase) return false;
+      // Table should be created in Supabase dashboard or via SQL:
+      // CREATE TABLE leaderboard (
+      //   id BIGSERIAL PRIMARY KEY,
+      //   name TEXT NOT NULL,
+      //   waves INTEGER NOT NULL,
+      //   difficulty TEXT NOT NULL,
+      //   kills INTEGER DEFAULT 0,
+      //   timestamp BIGINT NOT NULL,
+      //   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      // );
+      return true;
+    },
+    
+    async load() {
       try {
-        const data = localStorage.getItem(this.key);
-        return data ? JSON.parse(data) : [];
-      } catch (e) { return []; }
+        if (!supabase) {
+          Log.warn("Supabase not available, using fallback");
+          // Fallback to localStorage
+          const data = localStorage.getItem('leaderboard-fallback');
+          return data ? JSON.parse(data) : [];
+        }
+        
+        const { data, error } = await supabase
+          .from(this.tableName)
+          .select('*')
+          .order('waves', { ascending: false })
+          .order('kills', { ascending: false })
+          .limit(50);
+        
+        if (error) {
+          Log.warn("Supabase query error:", error.message);
+          // Fallback to localStorage
+          const fallbackData = localStorage.getItem('leaderboard-fallback');
+          return fallbackData ? JSON.parse(fallbackData) : [];
+        }
+        
+        return data || [];
+      } catch (e) {
+        Log.warn("Failed to load leaderboard:", e);
+        // Fallback to localStorage
+        const fallbackData = localStorage.getItem('leaderboard-fallback');
+        return fallbackData ? JSON.parse(fallbackData) : [];
+      }
     },
-    save(data) {
-      try { localStorage.setItem(this.key, JSON.stringify(data)); }
-      catch (e) {}
+    
+    async addScore(name, waves, difficulty, kills) {
+      try {
+        const timestamp = Date.now();
+        const scoreData = { 
+          name: name || "Anonymous", 
+          waves, 
+          difficulty: difficulty || "Normal",
+          kills: kills || 0,
+          timestamp 
+        };
+        
+        if (!supabase) {
+          Log.warn("Supabase not available, using localStorage fallback");
+          // Fallback to localStorage
+          let scores = [];
+          const fallbackData = localStorage.getItem('leaderboard-fallback');
+          if (fallbackData) {
+            scores = JSON.parse(fallbackData);
+          }
+          scores.push(scoreData);
+          scores.sort((a, b) => {
+            if (b.waves !== a.waves) return b.waves - a.waves;
+            return b.kills - a.kills;
+          });
+          scores = scores.slice(0, 50);
+          localStorage.setItem('leaderboard-fallback', JSON.stringify(scores));
+          Log.info("Score added to local leaderboard: " + name + " - Wave " + waves);
+          return true;
+        }
+        
+        const { data, error } = await supabase
+          .from(this.tableName)
+          .insert([scoreData])
+          .select();
+        
+        if (error) {
+          Log.error("Failed to save to Supabase:", error.message);
+          // Save to localStorage as backup
+          let scores = [];
+          const fallbackData = localStorage.getItem('leaderboard-fallback');
+          if (fallbackData) {
+            scores = JSON.parse(fallbackData);
+          }
+          scores.push(scoreData);
+          scores.sort((a, b) => {
+            if (b.waves !== a.waves) return b.waves - a.waves;
+            return b.kills - a.kills;
+          });
+          scores = scores.slice(0, 50);
+          localStorage.setItem('leaderboard-fallback', JSON.stringify(scores));
+          Log.warn("Score saved to local fallback");
+          return false;
+        }
+        
+        Log.info("Score added to Supabase leaderboard: " + name + " - Wave " + waves);
+        return true;
+      } catch (e) {
+        Log.error("Failed to add score:", e);
+        return false;
+      }
     },
-    addScore(name, waves) {
-      let scores = this.load();
-      scores.push({ name, waves });
-      scores.sort((a, b) => b.waves - a.waves);
-      scores = scores.slice(0, 10);
-      this.save(scores);
+    
+    async getTopScores(limit = 10) {
+      const scores = await this.load();
+      return scores.slice(0, limit);
+    },
+    
+    async getUserRank(name, waves) {
+      const scores = await this.load();
+      const index = scores.findIndex(s => s.name === name && s.waves === waves);
+      return index >= 0 ? index + 1 : -1;
     }
   };
 
@@ -248,7 +374,7 @@
       const data = this.load();
       if (!data.usernames.includes(username)) {
         data.usernames.push(username);
-        data.count = data.usernames.length; // Count is the number of unique usernames
+        data.count = data.usernames.length;
         this.save(data);
       }
       return data.count;
@@ -649,7 +775,7 @@
         UI.showToast("🔥 BOSS WAVE " + this.wave + "! 🔥");
         Log.info("BOSS SPAWNED ON WAVE " + this.wave);
       } else {
-        const enemyCount = Math.min(this.calculateEnemyCount(), 10);
+        const enemyCount = this.wave;
         Log.info("Wave " + this.wave + ": Spawning " + enemyCount + " enemies initially");
         
         for (let i = 0; i < enemyCount; i++) {
@@ -685,7 +811,7 @@
       UI.showToast("Multiplayer: P1 hunt P2!");
     }
 
-    gameOver() {
+    async gameOver() {
       this.isRunning = false;
       this.paused = true;
       if (this.isMultiplayer) {
@@ -695,7 +821,8 @@
         sd.coins += Math.floor(this.player.coins);
         if (this.wave > sd.bestWave) sd.bestWave = this.wave;
         Save.save(sd);
-        Leaderboard.addScore(this.userName, this.wave);
+        
+        await Leaderboard.addScore(this.userName, this.wave, this.difficulty, this.player.kills);
         UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
       }
     }
@@ -1092,13 +1219,16 @@
         ctx.restore();
         
         ctx.fillStyle = "white";
-        ctx.font = "20px monospace";
+        ctx.font = "24px monospace";
         if (this.isRunning) {
           const timeLeft = this.waveTimeLimit - this.waveTimer;
           const mins = Math.floor(timeLeft / 60);
           const secs = Math.floor(timeLeft % 60).toString().padStart(2, '0');
-          ctx.fillText("Wave " + this.wave + " Time: " + mins + ":" + secs, this.canvas.width / 2 - 100, 30);
+          ctx.fillText("Wave " + this.wave + " - Time: " + mins + ":" + secs, 20, 40);
+        } else {
+          ctx.fillText("Press SPACE to start Wave " + (this.wave + 1), 20, 40);
         }
+        ctx.font = "18px monospace";
         ctx.fillText("Players: " + PlayerCounter.getCount(), this.canvas.width - 150, 30);
       }
       this.drawMinimap(ctx);
@@ -1259,11 +1389,11 @@
         this.elements.homeScreen.appendChild(multiplayerBtn);
         
         const leaderboardBtn = document.createElement("button");
-        leaderboardBtn.textContent = "Leaderboard";
-        leaderboardBtn.addEventListener("click", () => {
+        leaderboardBtn.textContent = "🏆 Global Leaderboard";
+        leaderboardBtn.addEventListener("click", async () => {
           this.elements.homeScreen.style.display = "none";
           this.elements.leaderboardScreen.style.display = "flex";
-          this.updateLeaderboard();
+          await this.updateLeaderboard();
         });
         this.elements.homeScreen.appendChild(leaderboardBtn);
         
@@ -1287,32 +1417,158 @@
     createLeaderboardScreen() {
       const screen = document.createElement("div");
       screen.id = "leaderboardScreen";
-      screen.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:monospace;";
+      screen.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:monospace;padding:20px;overflow-y:auto;";
       screen.innerHTML = `
-        <h2>Leaderboard - Top Waves</h2>
-        <table id="leaderboardTable" style="text-align:left;">
-          <thead><tr><th>Rank</th><th>Name</th><th>Waves</th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <button id="leaderboardBackBtn">Back</button>
+        <div style="max-width:900px;width:100%;">
+          <h2 style="text-align:center;color:#00d9ff;font-size:36px;margin-bottom:10px;">🏆 Global Leaderboard 🏆</h2>
+          <p style="text-align:center;color:#aaa;margin-bottom:30px;">Top 50 Survivors - Compete Worldwide!</p>
+          
+          <div style="display:flex;gap:10px;margin-bottom:20px;justify-content:center;">
+            <button id="filterAll" class="filter-btn active" style="padding:10px 20px;background:#00d9ff;color:#000;border:none;cursor:pointer;font-family:monospace;font-weight:bold;">All</button>
+            <button id="filterEasy" class="filter-btn" style="padding:10px 20px;background:#333;color:#fff;border:none;cursor:pointer;font-family:monospace;">Easy</button>
+            <button id="filterNormal" class="filter-btn" style="padding:10px 20px;background:#333;color:#fff;border:none;cursor:pointer;font-family:monospace;">Normal</button>
+            <button id="filterHard" class="filter-btn" style="padding:10px 20px;background:#333;color:#fff;border:none;cursor:pointer;font-family:monospace;">Hard</button>
+            <button id="filterNightmare" class="filter-btn" style="padding:10px 20px;background:#333;color:#fff;border:none;cursor:pointer;font-family:monospace;">Nightmare</button>
+          </div>
+          
+          <div id="leaderboardLoading" style="text-align:center;color:#00d9ff;font-size:18px;padding:40px;">
+            Loading leaderboard...
+          </div>
+          
+          <div id="leaderboardContent" style="display:none;">
+            <table id="leaderboardTable" style="width:100%;border-collapse:collapse;background:rgba(0,0,0,0.5);border:2px solid #00d9ff;">
+              <thead>
+                <tr style="background:#00d9ff;color:#000;">
+                  <th style="padding:15px;text-align:left;font-weight:bold;">Rank</th>
+                  <th style="padding:15px;text-align:left;font-weight:bold;">Player</th>
+                  <th style="padding:15px;text-align:center;font-weight:bold;">Wave</th>
+                  <th style="padding:15px;text-align:center;font-weight:bold;">Kills</th>
+                  <th style="padding:15px;text-align:center;font-weight:bold;">Difficulty</th>
+                  <th style="padding:15px;text-align:center;font-weight:bold;">Date</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboardTableBody"></tbody>
+            </table>
+            
+            <div id="noScores" style="display:none;text-align:center;padding:40px;color:#aaa;font-size:18px;">
+              No scores yet. Be the first to set a record!
+            </div>
+          </div>
+          
+          <div style="text-align:center;margin-top:30px;">
+            <button id="leaderboardBackBtn" style="padding:15px 40px;background:#ff3366;color:#fff;border:none;cursor:pointer;font-family:monospace;font-size:18px;font-weight:bold;">Back to Menu</button>
+          </div>
+        </div>
       `;
       document.body.appendChild(screen);
+      
+      const filterBtns = screen.querySelectorAll('.filter-btn');
+      filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          filterBtns.forEach(b => {
+            b.classList.remove('active');
+            b.style.background = '#333';
+          });
+          btn.classList.add('active');
+          btn.style.background = '#00d9ff';
+          
+          const filter = btn.id.replace('filter', '');
+          this.updateLeaderboard(filter === 'All' ? null : filter);
+        });
+      });
+      
       document.getElementById("leaderboardBackBtn").addEventListener("click", () => {
         screen.style.display = "none";
         this.elements.homeScreen.style.display = "flex";
       });
+      
       return screen;
     },
     
-    updateLeaderboard() {
-      const scores = Leaderboard.load();
-      const tbody = document.getElementById("leaderboardTable").querySelector("tbody");
-      tbody.innerHTML = "";
-      scores.forEach((score, index) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${index + 1}</td><td>${score.name}</td><td>${score.waves}</td>`;
-        tbody.appendChild(tr);
-      });
+    async updateLeaderboard(difficultyFilter = null) {
+      const loading = document.getElementById("leaderboardLoading");
+      const content = document.getElementById("leaderboardContent");
+      const tbody = document.getElementById("leaderboardTableBody");
+      const noScores = document.getElementById("noScores");
+      
+      loading.style.display = "block";
+      content.style.display = "none";
+      
+      try {
+        const allScores = await Leaderboard.load();
+        
+        let scores = allScores;
+        if (difficultyFilter) {
+          scores = allScores.filter(s => s.difficulty === difficultyFilter);
+        }
+        
+        loading.style.display = "none";
+        content.style.display = "block";
+        
+        if (scores.length === 0) {
+          tbody.innerHTML = "";
+          noScores.style.display = "block";
+          return;
+        }
+        
+        noScores.style.display = "none";
+        tbody.innerHTML = "";
+        
+        const difficultyColors = {
+          Easy: '#4CAF50',
+          Normal: '#2196F3',
+          Hard: '#FF9800',
+          Nightmare: '#f44336'
+        };
+        
+        scores.forEach((score, index) => {
+          const tr = document.createElement("tr");
+          tr.style.cssText = "border-bottom:1px solid #333;transition:background 0.2s;";
+          tr.onmouseover = () => tr.style.background = "rgba(0,217,255,0.1)";
+          tr.onmouseout = () => tr.style.background = index < 3 ? "rgba(255,215,0,0.1)" : "transparent";
+          
+          if (index < 3) {
+            tr.style.background = "rgba(255,215,0,0.1)";
+          }
+          
+          const rankIcon = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "";
+          const date = new Date(score.timestamp || Date.now());
+          const dateStr = date.toLocaleDateString();
+          
+          const diffColor = difficultyColors[score.difficulty] || '#fff';
+          
+          tr.innerHTML = `
+            <td style="padding:12px;color:#00d9ff;font-weight:bold;font-size:18px;">${rankIcon} #${index + 1}</td>
+            <td style="padding:12px;color:#fff;font-size:16px;">${score.name}</td>
+            <td style="padding:12px;text-align:center;color:#00ff88;font-weight:bold;font-size:18px;">${score.waves}</td>
+            <td style="padding:12px;text-align:center;color:#ffaa00;">${score.kills || 0}</td>
+            <td style="padding:12px;text-align:center;color:${diffColor};font-weight:bold;">${score.difficulty || 'Normal'}</td>
+            <td style="padding:12px;text-align:center;color:#999;font-size:14px;">${dateStr}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+        
+        const currentUser = window.game?.world?.userName;
+        if (currentUser && currentUser !== "Guest") {
+          const userScores = scores.filter(s => s.name === currentUser);
+          if (userScores.length > 0) {
+            const bestUserScore = userScores[0];
+            const userRank = scores.findIndex(s => s === bestUserScore) + 1;
+            
+            const userInfoDiv = document.createElement("div");
+            userInfoDiv.style.cssText = "margin-top:20px;padding:15px;background:rgba(0,217,255,0.2);border:2px solid #00d9ff;border-radius:8px;text-align:center;";
+            userInfoDiv.innerHTML = `
+              <p style="margin:0;color:#00d9ff;font-size:18px;font-weight:bold;">Your Best: Rank #${userRank} - Wave ${bestUserScore.waves} (${bestUserScore.difficulty})</p>
+            `;
+            content.appendChild(userInfoDiv);
+          }
+        }
+        
+      } catch (error) {
+        Log.error("Failed to load leaderboard:", error);
+        loading.innerHTML = "Failed to load leaderboard. Please try again.";
+        loading.style.color = "#ff3366";
+      }
     },
     
     handleLogin() {
