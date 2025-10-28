@@ -817,12 +817,24 @@
       if (this.isMultiplayer) {
         UI.showGameOver(this.winner + " Wins!", 0, 0);
       } else {
+        // Save local progress
         const sd = Save.load();
         sd.coins += Math.floor(this.player.coins);
         if (this.wave > sd.bestWave) sd.bestWave = this.wave;
         Save.save(sd);
         
-        await Leaderboard.addScore(this.userName, this.wave, this.difficulty, this.player.kills);
+        // Only save to global leaderboard if player beat at least wave 1 (reached wave 2+)
+        if (this.wave > 1) {
+          // Get user (userName is already set)
+          const playerName = this.userName || "Guest";
+          
+          // Send score to Supabase (global leaderboard)
+          await Leaderboard.addScore(playerName, this.wave, this.difficulty, this.player.kills);
+          Log.info("Score submitted to global leaderboard: " + playerName + " - Wave " + this.wave);
+        } else {
+          Log.info("Score not submitted (must reach wave 2+)");
+        }
+        
         UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
       }
     }
