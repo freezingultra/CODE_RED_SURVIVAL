@@ -1,17 +1,10 @@
-// game.js - Code Red: Survival - COMPLETE WITH GLOBAL LEADERBOARD
+// game.js - Code Red: Survival - COMPLETE WITH SUPABASE GLOBAL LEADERBOARD
 (function() {
   "use strict";
 
-  // Initialize Supabase
+  // SUPABASE CONFIGURATION
   const SUPABASE_URL = 'https://fkbnpjbbiijlprdhjnad.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrYm5wamJiaWlqbHByZGhqbmFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE0ODI0NTQsImV4cCI6MjA3NzA1ODQ1NH0.a_qtutu3Lnbr4CIu_21gpqofiOjF_ihuaUE782weutk';
-  const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
-  
-  if (!supabase) {
-    console.warn('[GAME] Supabase not available, leaderboard features may be limited');
-  } else {
-    console.info('[GAME] Supabase initialized successfully');
-  }
 
   const CONFIG = {
     tileSize: 32,
@@ -229,112 +222,63 @@
     }
   };
 
-  // Global Leaderboard with Supabase
-  const Leaderboard = {
-    tableName: 'Lederboard',
-    
-    async ensureTable() {
-      if (!supabase) return false;
-      // Table should be created in Supabase dashboard or via SQL:
-      // CREATE TABLE leaderboard (
-      //   id BIGSERIAL PRIMARY KEY,
-      //   name TEXT NOT NULL,
-      //   waves INTEGER NOT NULL,
-      //   difficulty TEXT NOT NULL,
-      //   kills INTEGER DEFAULT 0,
-      //   timestamp BIGINT NOT NULL,
-      //   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      // );
-      return true;
+  // Supabase Helper
+  const Supabase = {
+    async request(method, endpoint, body = null) {
+      const options = {
+        method,
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        }
+      };
+      
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, options);
+      if (!response.ok) {
+        throw new Error(`Supabase error: ${response.statusText}`);
+      }
+      return response.json();
     },
     
+    async insert(table, data) {
+      return this.request('POST', table, data);
+    },
+    
+    async select(table, query = '') {
+      return this.request('GET', `${table}?${query}`);
+    }
+  };
+
+  // Global Leaderboard with Supabase
+  const Leaderboard = {
     async load() {
       try {
-        if (!supabase) {
-          Log.warn("Supabase not available, using fallback");
-          // Fallback to localStorage
-          const data = localStorage.getItem('leaderboard-fallback');
-          return data ? JSON.parse(data) : [];
-        }
-        
-        const { data, error } = await supabase
-          .from(this.tableName)
-          .select('*')
-          .order('waves', { ascending: false })
-          .order('kills', { ascending: false })
-          .limit(50);
-        
-        if (error) {
-          Log.warn("Supabase query error:", error.message);
-          // Fallback to localStorage
-          const fallbackData = localStorage.getItem('leaderboard-fallback');
-          return fallbackData ? JSON.parse(fallbackData) : [];
-        }
-        
-        return data || [];
+        const scores = await Supabase.select('leaderboard', 'select=*&order=waves.desc,kills.desc&limit=50');
+        return scores || [];
       } catch (e) {
-        Log.warn("Failed to load leaderboard:", e);
-        // Fallback to localStorage
-        const fallbackData = localStorage.getItem('leaderboard-fallback');
-        return fallbackData ? JSON.parse(fallbackData) : [];
+        Log.error("Failed to load leaderboard:", e);
+        return [];
       }
     },
     
     async addScore(name, waves, difficulty, kills) {
       try {
-        const timestamp = Date.now();
-        const scoreData = { 
-          name: name || "Anonymous", 
-          waves, 
+        const scoreData = {
+          name: name || "Anonymous",
+          waves: waves,
           difficulty: difficulty || "Normal",
           kills: kills || 0,
-          timestamp 
+          timestamp: Date.now()
         };
         
-        if (!supabase) {
-          Log.warn("Supabase not available, using localStorage fallback");
-          // Fallback to localStorage
-          let scores = [];
-          const fallbackData = localStorage.getItem('leaderboard-fallback');
-          if (fallbackData) {
-            scores = JSON.parse(fallbackData);
-          }
-          scores.push(scoreData);
-          scores.sort((a, b) => {
-            if (b.waves !== a.waves) return b.waves - a.waves;
-            return b.kills - a.kills;
-          });
-          scores = scores.slice(0, 50);
-          localStorage.setItem('leaderboard-fallback', JSON.stringify(scores));
-          Log.info("Score added to local leaderboard: " + name + " - Wave " + waves);
-          return true;
-        }
-        
-        const { data, error } = await supabase
-          .from(this.tableName)
-          .insert([scoreData])
-          .select();
-        
-        if (error) {
-          Log.error("Failed to save to Supabase:", error.message);
-          // Save to localStorage as backup
-          let scores = [];
-          const fallbackData = localStorage.getItem('leaderboard-fallback');
-          if (fallbackData) {
-            scores = JSON.parse(fallbackData);
-          }
-          scores.push(scoreData);
-          scores.sort((a, b) => {
-            if (b.waves !== a.waves) return b.waves - a.waves;
-            return b.kills - a.kills;
-          });
-          scores = scores.slice(0, 50);
-          localStorage.setItem('leaderboard-fallback', JSON.stringify(scores));
-          Log.warn("Score saved to local fallback");
-          return false;
-        }
-        
-        Log.info("Score added to Supabase leaderboard: " + name + " - Wave " + waves);
+        await Supabase.insert('leaderboard', scoreData);
+        Log.info("Score added to leaderboard: " + name + " - Wave " + waves);
         return true;
       } catch (e) {
         Log.error("Failed to add score:", e);
@@ -651,6 +595,7 @@
       this.totalPlayTime = 0;
       this.winner = "";
       this.paused = false;
+      this.cheatsUsed = false;
       this.camera = { x: 0, y: 0, w: canvas.width, h: canvas.height };
       this.camera1 = { x: 0, y: 0, w: canvas.width, h: canvas.height / 2 };
       this.camera2 = { x: 0, y: 0, w: canvas.width, h: canvas.height / 2 };
@@ -817,25 +762,19 @@
       if (this.isMultiplayer) {
         UI.showGameOver(this.winner + " Wins!", 0, 0);
       } else {
-        // Save local progress
         const sd = Save.load();
         sd.coins += Math.floor(this.player.coins);
         if (this.wave > sd.bestWave) sd.bestWave = this.wave;
         Save.save(sd);
         
-        // Only save to global leaderboard if player beat at least wave 1 (reached wave 2+)
-        if (this.wave > 1) {
-          // Get user (userName is already set)
-          const playerName = this.userName || "Guest";
-          
-          // Send score to Supabase (global leaderboard)
-          await Leaderboard.addScore(playerName, this.wave, this.difficulty, this.player.kills);
-          Log.info("Score submitted to global leaderboard: " + playerName + " - Wave " + this.wave);
+        if (!this.cheatsUsed) {
+          await Leaderboard.addScore(this.userName, this.wave, this.difficulty, this.player.kills);
+          UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
         } else {
-          Log.info("Score not submitted (must reach wave 2+)");
+          UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
+          UI.showToast("⚠️ Cheats Used - Score Not Submitted to Leaderboard");
+          Log.warn("Score not submitted - cheats were used");
         }
-        
-        UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
       }
     }
 
@@ -1224,6 +1163,10 @@
         const secs = Math.floor(timeLeft % 60).toString().padStart(2, '0');
         ctx.fillText("Time: " + mins + ":" + secs, w / 2 - 50, 30);
         ctx.fillText("Players: " + PlayerCounter.getCount(), w - 150, 30);
+        
+        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.font = "14px monospace";
+        ctx.fillText("v1.0.7", w - 60, this.canvas.height - 10);
       } else {
         ctx.save();
         ctx.translate(-this.camera.x, -this.camera.y);
@@ -1242,6 +1185,10 @@
         }
         ctx.font = "18px monospace";
         ctx.fillText("Players: " + PlayerCounter.getCount(), this.canvas.width - 150, 30);
+        
+        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.font = "14px monospace";
+        ctx.fillText("v1.0.7", this.canvas.width - 60, this.canvas.height - 10);
       }
       this.drawMinimap(ctx);
     }
