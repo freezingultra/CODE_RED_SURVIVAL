@@ -1820,6 +1820,16 @@
       const loginSubmitBtn = document.getElementById("loginSubmitBtn");
       const loginScreen = document.getElementById("loginScreen");
       
+      // Check if user is already logged in
+      const savedUser = localStorage.getItem("codered-user");
+      if (savedUser) {
+        Log.info("User already logged in: " + savedUser);
+        loginScreen.style.display = "none";
+        this.isLoggedIn = true;
+        this.startLoading(savedUser);
+        return;
+      }
+      
       const handleLogin = () => {
         const name = loginInput.value.trim();
         
