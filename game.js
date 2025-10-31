@@ -1336,37 +1336,46 @@
         leaderboardScreen: this.createLeaderboardScreen()
       };
       
-      if (this.elements.homeScreen) {
-        const multiplayerBtn = document.createElement("button");
-        multiplayerBtn.textContent = "Start Multiplayer";
+      // Bind multiplayer button
+      const multiplayerBtn = document.getElementById("multiplayerBtn");
+      if (multiplayerBtn) {
         multiplayerBtn.addEventListener("click", () => {
           this.hideAll();
           if (window.game && window.game.world) {
             window.game.world.startMultiplayer();
           }
         });
-        this.elements.homeScreen.appendChild(multiplayerBtn);
-        
-        const leaderboardBtn = document.createElement("button");
-        leaderboardBtn.textContent = "🏆 Global Leaderboard";
+      }
+      
+      // Bind leaderboard button
+      const leaderboardBtn = document.getElementById("leaderboardBtn");
+      if (leaderboardBtn) {
         leaderboardBtn.addEventListener("click", async () => {
           this.elements.homeScreen.style.display = "none";
           this.elements.leaderboardScreen.style.display = "flex";
           await this.updateLeaderboard();
         });
-        this.elements.homeScreen.appendChild(leaderboardBtn);
+      }
+      
+      // Bind login/logout button
+      const logoutBtn = document.getElementById("logoutBtn");
+      if (logoutBtn) {
+        this.loginBtn = logoutBtn;
         
-        const loginBtn = document.createElement("button");
-        loginBtn.textContent = window.game.world.isLoggedIn ? "Logout" : "Login";
-        this.loginBtn = loginBtn;
-        loginBtn.addEventListener("click", () => {
+        // Update button text based on login status
+        if (window.game.world.isLoggedIn) {
+          logoutBtn.innerHTML = "🚪 Logout";
+        } else {
+          logoutBtn.innerHTML = "🚪 Login";
+        }
+        
+        logoutBtn.addEventListener("click", () => {
           if (window.game.world.isLoggedIn) {
             this.handleLogout();
           } else {
             this.handleLogin();
           }
         });
-        this.elements.homeScreen.appendChild(loginBtn);
       }
       
       this.bindEvents();
@@ -1376,9 +1385,9 @@
     createLeaderboardScreen() {
       const screen = document.createElement("div");
       screen.id = "leaderboardScreen";
-      screen.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:monospace;padding:20px;overflow-y:auto;";
+      screen.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:none;align-items:flex-start;justify-content:flex-start;color:white;font-family:monospace;overflow-y:auto;";
       screen.innerHTML = `
-        <div style="max-width:900px;width:100%;">
+        <div style="max-width:900px;width:100%;margin:40px auto;padding:20px;">
           <h2 style="text-align:center;color:#00d9ff;font-size:36px;margin-bottom:10px;">🏆 Global Leaderboard 🏆</h2>
           <p style="text-align:center;color:#aaa;margin-bottom:30px;">Top 50 Survivors - Compete Worldwide!</p>
           
@@ -1791,6 +1800,7 @@
       this.ctx = canvas.getContext("2d");
       this.running = false;
       this.lastTime = performance.now();
+      this.isLoggedIn = false;
       
       this.devConsole = new DevConsole();
       
@@ -1798,6 +1808,69 @@
       window.addEventListener("resize", () => this.resize());
       
       Input.init(canvas);
+      
+      // Handle login screen first - game doesn't load until login
+      this.setupLoginScreen();
+      
+      window.game = this;
+    }
+    
+    setupLoginScreen() {
+      const loginInput = document.getElementById("loginInput");
+      const loginSubmitBtn = document.getElementById("loginSubmitBtn");
+      const loginScreen = document.getElementById("loginScreen");
+      
+      const handleLogin = () => {
+        const name = loginInput.value.trim();
+        
+        // Validation: at least 3 characters
+        if (!name || name.length < 3) {
+          loginInput.style.borderColor = "#ff3366";
+          loginInput.placeholder = "Name must be at least 3 characters!";
+          loginInput.value = "";
+          setTimeout(() => {
+            loginInput.style.borderColor = "#00d9ff";
+            loginInput.placeholder = "Enter your name...";
+          }, 2000);
+          return;
+        }
+        
+        // Validation: no numbers allowed
+        if (/\d/.test(name)) {
+          loginInput.style.borderColor = "#ff3366";
+          loginInput.placeholder = "No numbers allowed!";
+          loginInput.value = "";
+          setTimeout(() => {
+            loginInput.style.borderColor = "#00d9ff";
+            loginInput.placeholder = "Enter your name...";
+          }, 2000);
+          return;
+        }
+        
+        // Valid name - proceed
+        this.isLoggedIn = true;
+        localStorage.setItem("codered-user", name);
+        PlayerCounter.addPlayer(name);
+        
+        // Hide login screen and start loading
+        loginScreen.style.display = "none";
+        this.startLoading(name);
+      };
+      
+      loginSubmitBtn.addEventListener("click", handleLogin);
+      loginInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          handleLogin();
+        }
+      });
+      
+      // Focus the input field
+      setTimeout(() => loginInput.focus(), 100);
+    }
+    
+    startLoading(userName) {
+      const loadingScreen = document.getElementById("loadingScreen");
+      loadingScreen.style.display = "flex";
       
       let progress = 0;
       const loadingInterval = setInterval(() => {
@@ -1815,13 +1888,15 @@
         if (progress >= 100) {
           clearInterval(loadingInterval);
           setTimeout(() => {
-            this.world = new World(canvas);
+            this.world = new World(this.canvas);
+            this.world.isLoggedIn = true;
+            this.world.userName = userName;
+            
             const activeBtn = document.querySelector(".difficulty-btn.active");
             if (activeBtn) this.world.difficulty = activeBtn.dataset.difficulty;
             
             UI.init();
             
-            const loadingScreen = document.getElementById("loadingScreen");
             const homeScreen = document.getElementById("homeScreen");
             
             if (loadingScreen) {
@@ -1833,14 +1908,12 @@
             
             this.running = true;
             this.loop();
-            Log.info("Game Ready! Press SPACE to start wave 1");
+            Log.info("Game Ready! Logged in as: " + userName);
+            UI.showToast("Welcome, " + userName + "!");
           }, 300);
         }
       }, 100);
-      
-      window.game = this;
     }
-
     loop() {
       if (!this.running) return;
       
