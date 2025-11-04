@@ -559,6 +559,15 @@
       ctx.fill();
       ctx.stroke();
 
+      // Add attack range circle around ranged enemies (300 radius)
+      if (this.type === "ranged") {
+        ctx.strokeStyle = "rgba(255, 153, 0, 0.3)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 300, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       if (this.hp < this.maxHp) {
         const barW = this.radius * 2, barH = 4;
         ctx.fillStyle = "rgba(0,0,0,0.8)";
@@ -1125,7 +1134,51 @@
       this.camera.x += (targetX - this.camera.x) * 0.1;
       this.camera.y += (targetY - this.camera.y) * 0.1;
       
+      // Update HTML HUD elements
+      this.updateHTMLHUD();
+      
       UI.updateHUD(this);
+    }
+    
+    updateHTMLHUD() {
+      if (this.isMultiplayer) return;
+      
+      try {
+        // Wave display
+        if (document.getElementById('waveNumber')) {
+          document.getElementById('waveNumber').textContent = this.wave;
+        }
+        
+        // Health bar
+        if (document.getElementById('healthBar')) {
+          const healthPercent = Math.max(0, (this.player.hp / this.player.maxHp) * 100);
+          document.getElementById('healthBar').style.width = `${healthPercent}%`;
+          document.getElementById('healthBar').style.backgroundColor = 
+            healthPercent > 60 ? '#00ff88' : healthPercent > 30 ? '#ffaa00' : '#ff3366';
+        }
+        
+        // Coins and gems
+        if (document.getElementById('coinCount')) {
+          document.getElementById('coinCount').textContent = Math.floor(this.player.coins);
+        }
+        if (document.getElementById('gemCount')) {
+          document.getElementById('gemCount').textContent = Math.floor(this.player.gems);
+        }
+        
+        // Armor display
+        const armorDisplay = document.getElementById('armorDisplay');
+        if (armorDisplay) {
+          if (this.player.armor > 0) {
+            armorDisplay.style.display = 'block';
+            const armorPercent = Math.min(100, (this.player.armor / 0.75) * 100);
+            document.getElementById('armorBar').style.width = `${armorPercent}%`;
+          } else {
+            armorDisplay.style.display = 'none';
+          }
+        }
+      } catch (e) {
+        console.error('Error updating HTML HUD:', e);
+      }
     }
 
     draw() {
@@ -1174,21 +1227,27 @@
         ctx.restore();
         
         ctx.fillStyle = "white";
-        ctx.font = "24px monospace";
+        ctx.font = "bold 18px monospace";
+        
+        // Player stats
+        ctx.fillText(`HP: ${Math.round(this.player.hp)}/${this.player.maxHp}`, 20, 30);
+        ctx.fillText(`Coins: ${Math.floor(this.player.coins)}`, 20, 55);
+        ctx.fillText(`Kills: ${this.player.kills}`, 20, 80);
+        
+        // Timer at top center
+        ctx.font = "bold 24px monospace";
         if (this.isRunning) {
           const timeLeft = this.waveTimeLimit - this.waveTimer;
           const mins = Math.floor(timeLeft / 60);
           const secs = Math.floor(timeLeft % 60).toString().padStart(2, '0');
-          ctx.fillText("Wave " + this.wave + " - Time: " + mins + ":" + secs, 20, 40);
+          const text = `Wave ${this.wave} - ${mins}:${secs}`;
+          const textWidth = ctx.measureText(text).width;
+          ctx.fillText(text, this.canvas.width/2 - textWidth/2, 40);
         } else {
-          ctx.fillText("Press SPACE to start Wave " + (this.wave + 1), 20, 40);
+          const text = `Press SPACE to start Wave ${this.wave + 1}`;
+          const textWidth = ctx.measureText(text).width;
+          ctx.fillText(text, this.canvas.width/2 - textWidth/2, 40);
         }
-        ctx.font = "18px monospace";
-        ctx.fillText("Players: " + PlayerCounter.getCount(), this.canvas.width - 150, 30);
-        
-        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.font = "14px monospace";
-        ctx.fillText("v1.0.7", this.canvas.width - 60, this.canvas.height - 10);
       }
       this.drawMinimap(ctx);
     }
@@ -1363,14 +1422,14 @@
         this.loginBtn = logoutBtn;
         
         // Update button text based on login status
-        if (window.game.world.isLoggedIn) {
+        if (window.game && window.game.world) {
           logoutBtn.innerHTML = "🚪 Logout";
         } else {
           logoutBtn.innerHTML = "🚪 Login";
         }
         
         logoutBtn.addEventListener("click", () => {
-          if (window.game.world.isLoggedIn) {
+          if (window.game && window.game.world) {
             this.handleLogout();
           } else {
             this.handleLogin();
