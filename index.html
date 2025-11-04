@@ -144,67 +144,6 @@
       box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
     }
     
-    .hud {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 900;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 15px;
-      border-radius: 12px;
-      border: 2px solid #00d9ff;
-      min-width: 220px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
-    }
-    
-    .hud-item {
-      margin: 10px 0;
-      font-size: 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .hud-item strong {
-      color: #00d9ff;
-    }
-    
-    .health-bar {
-      width: 100%;
-      height: 22px;
-      background: #222;
-      border-radius: 11px;
-      overflow: hidden;
-      margin-top: 5px;
-      border: 1px solid #444;
-    }
-    
-    .health-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #ff3366 0%, #ffaa00 50%, #00ff88 100%);
-      transition: width 0.3s;
-      box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3);
-    }
-    
-    .wave-display {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.85);
-      padding: 15px 30px;
-      border-radius: 12px;
-      border: 2px solid #00d9ff;
-      font-size: 28px;
-      font-weight: bold;
-      color: #00d9ff;
-      z-index: 900;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 0 25px rgba(0, 217, 255, 0.4);
-      text-shadow: 0 0 10px rgba(0, 217, 255, 0.8);
-    }
-    
     .toast {
       position: fixed;
       bottom: 30px;
@@ -374,8 +313,6 @@
 <body>
   <canvas id="game"></canvas>
   
-  <div class="wave-display">WAVE <span id="waveNumber">0</span></div>
-  
   <div class="hud">
     <div class="hud-item">
       <strong>❤️ HEALTH</strong>
@@ -406,6 +343,7 @@
   <div id="homeScreen" class="overlay">
     <div class="dialog">
       <h1>⚠️ CODE RED ⚠️</h1>
+      <p style="color: #00d9ff; margin-bottom: 5px;">v.1.0.66</p>
       <h2>SURVIVAL</h2>
       <p style="color: #00d9ff; font-size: 16px;">Backrooms Edition</p>
       
