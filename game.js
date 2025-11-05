@@ -1110,8 +1110,8 @@
       
       for (let i = this.loots.length - 1; i >= 0; i--) {
         const l = this.loots[i];
-        const pickupDist = (l.radius + this.player.radius + (12 * (this.player.pickupRadius || 1)));
-        const pickupDistSq = pickupDist * pickupDist;
+        const pickupRadius = l.radius + this.player.radius + (12 * (this.player.pickupRadius || 1));
+        const pickupDistSq = pickupRadius * pickupRadius;
         if (dist2(l.x, l.y, this.player.x, this.player.y) < pickupDistSq) {
           if (l.type === "coin") {
             this.player.coins += l.value;
@@ -1229,26 +1229,61 @@
         ctx.fillStyle = "white";
         ctx.font = "bold 18px monospace";
         
-        // Player stats
-        ctx.fillText(`HP: ${Math.round(this.player.hp)}/${this.player.maxHp}`, 20, 30);
-        ctx.fillText(`Coins: ${Math.floor(this.player.coins)}`, 20, 55);
-        ctx.fillText(`Kills: ${this.player.kills}`, 20, 80);
+        // Modern HUD panel
+        ctx.save();
         
-        // Timer at top center
-        ctx.font = "bold 24px monospace";
+        // Background panel
+        ctx.fillStyle = 'rgba(20, 20, 30, 0.85)';
+        ctx.strokeStyle = '#00d9ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(20, 20, 220, 100, 10);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Stats with modern styling
+        ctx.font = 'bold 16px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        
+        // Health with color coding
+        const hpPercent = this.player.hp / this.player.maxHp;
+        const hpColor = hpPercent > 0.6 ? '#00ff88' : hpPercent > 0.3 ? '#ffaa00' : '#ff3366';
+        ctx.fillText('HEALTH:', 40, 45);
+        ctx.fillStyle = hpColor;
+        ctx.fillText(`${Math.round(this.player.hp)}/${this.player.maxHp}`, 120, 45);
+        
+        // Coins
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('COINS:', 40, 70);
+        ctx.fillStyle = '#ffdd00';
+        ctx.fillText(Math.floor(this.player.coins), 120, 70);
+        
+        // Kills
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('KILLS:', 40, 95);
+        ctx.fillStyle = '#00d9ff';
+        ctx.fillText(this.player.kills, 120, 95);
+        
+        ctx.restore();
+        
+        // Modern wave timer
+        ctx.save();
+        ctx.font = 'bold 22px "Segoe UI", sans-serif';
+        ctx.fillStyle = 'rgba(0, 217, 255, 0.9)';
+        ctx.textAlign = 'center';
+        
         if (this.isRunning) {
           const timeLeft = this.waveTimeLimit - this.waveTimer;
           const mins = Math.floor(timeLeft / 60);
           const secs = Math.floor(timeLeft % 60).toString().padStart(2, '0');
-          const text = `Wave ${this.wave} - ${mins}:${secs}`;
-          const textWidth = ctx.measureText(text).width;
-          ctx.fillText(text, this.canvas.width/2 - textWidth/2, 40);
+          ctx.fillText(`WAVE ${this.wave} - ${mins}:${secs}`, this.canvas.width/2, 40);
         } else {
-          const text = `Press SPACE to start Wave ${this.wave + 1}`;
-          const textWidth = ctx.measureText(text).width;
-          ctx.fillText(text, this.canvas.width/2 - textWidth/2, 40);
+          ctx.fillText(`PRESS SPACE TO START WAVE ${this.wave + 1}`, this.canvas.width/2, 40);
         }
+        
+        ctx.restore();
       }
+      
       this.drawMinimap(ctx);
     }
 
@@ -1317,6 +1352,7 @@
 
     drawMinimap(ctx) {
       if (this.isMultiplayer) return;
+      
       const size = 180, pad = 12;
       const x = this.canvas.width - size - pad;
       const y = this.canvas.height - size - pad;
@@ -1369,6 +1405,84 @@
           color: color
         });
       }
+    }
+
+    findPathAStar(startX, startY, endX, endY) {
+      // Convert pixel coordinates to grid coordinates
+      const startTile = [Math.floor(startX / this.tileSize), Math.floor(startY / this.tileSize)];
+      const endTile = [Math.floor(endX / this.tileSize), Math.floor(endY / this.tileSize)];
+
+      // Heuristic function (Manhattan distance)
+      const heuristic = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+
+      // Create open and closed sets
+      const openSet = [startTile];
+      const cameFrom = {};
+      const gScore = { [startTile]: 0 };
+      const fScore = { [startTile]: heuristic(startTile, endTile) };
+
+      while (openSet.length > 0) {
+        // Find node in openSet with lowest fScore
+        let current = openSet[0];
+        let currentIndex = 0;
+        for (let i = 1; i < openSet.length; i++) {
+          const node = openSet[i];
+          if (fScore[node] < fScore[current]) {
+            current = node;
+            currentIndex = i;
+          }
+        }
+
+        // Check if we reached the goal
+        if (current[0] === endTile[0] && current[1] === endTile[1]) {
+          // Reconstruct path
+          const path = [];
+          let temp = current;
+          while (temp) {
+            path.push({ x: temp[0] * this.tileSize + this.tileSize/2, y: temp[1] * this.tileSize + this.tileSize/2 });
+            temp = cameFrom[temp];
+          }
+          return path.reverse();
+        }
+
+        // Move current from openSet to closedSet
+        openSet.splice(currentIndex, 1);
+        const currentKey = current;
+
+        // Check neighbors
+        const neighbors = [
+          [current[0] - 1, current[1]], // left
+          [current[0] + 1, current[1]], // right
+          [current[0], current[1] - 1], // up
+          [current[0], current[1] + 1]  // down
+        ];
+
+        for (const neighbor of neighbors) {
+          // Check if neighbor is valid (within bounds and walkable)
+          if (neighbor[0] < 0 || neighbor[0] >= this.mapW || neighbor[1] < 0 || neighbor[1] >= this.mapH) 
+            continue;
+          
+          if (this.map[neighbor[1] * this.mapW + neighbor[0]] === 1) // wall
+            continue;
+
+          // Calculate tentative gScore
+          const tentativeGScore = gScore[currentKey] + 1;
+          const neighborKey = neighbor;
+
+          if (tentativeGScore < (gScore[neighborKey] || Infinity)) {
+            cameFrom[neighborKey] = currentKey;
+            gScore[neighborKey] = tentativeGScore;
+            fScore[neighborKey] = tentativeGScore + heuristic(neighbor, endTile);
+
+            if (!openSet.some(node => node[0] === neighbor[0] && node[1] === neighbor[1])) {
+              openSet.push(neighbor);
+            }
+          }
+        }
+      }
+
+      // No path found
+      return [];
     }
   }
 
