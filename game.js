@@ -160,6 +160,11 @@
         if (!window.game || !window.game.world) return 'Game not ready';
         if (!window.game.world.isRunning) return 'No wave active';
         window.game.world.endWave();
+        // Update leaderboard after skipping wave
+        const w = window.game.world;
+        if (!w.cheatsUsed) {
+          Leaderboard.addScore(w.userName, w.wave, w.difficulty, w.player.kills);
+        }
         return 'Skipped to next wave';
       });
     }
@@ -487,7 +492,7 @@
       let vy = (dy / d) * this.speed;
 
       if (this.type === "ranged") {
-        if (d > 200) {
+        if (d > 175) {
           vx = (dx / d) * this.speed;
           vy = (dy / d) * this.speed;
         } else {
@@ -495,7 +500,7 @@
           vy = 0;
         }
         
-        if (d <= 300) {
+        if (d <= 175) {
           this.fireTimer -= dt;
           if (this.fireTimer <= 0) {
             this.fireTimer = randRange(0.8, 1.5);
@@ -564,7 +569,7 @@
         ctx.strokeStyle = "rgba(255, 153, 0, 0.3)";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, 300, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, 175, 0, Math.PI * 2);
         ctx.stroke();
       }
 
@@ -793,13 +798,16 @@
       this.enemies = [];
       
       const sd = Save.load();
-      const coinReward = Math.floor(this.wave * 6);
+      // Calculate coin reward: 20 + 2*(wave-1)
+      const coinReward = 20 + 2 * (this.wave - 1);
       sd.coins += coinReward;
       this.player.coins += coinReward;
+      // Add 25 HP to player
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + 25);
       if (this.wave > sd.bestWave) sd.bestWave = this.wave;
       Save.save(sd);
-      UI.showToast("Wave " + this.wave + " complete! +" + coinReward + " coins. Press SPACE for next wave!");
-      Log.info("Wave " + this.wave + " complete! Press SPACE to continue.");
+      UI.showToast(`Wave ${this.wave} complete! +${coinReward} coins and +25 HP. Press SPACE for next wave!`);
+      Log.info(`Wave ${this.wave} complete! Press SPACE to continue.`);
     }
 
     update(dt) {
@@ -1044,12 +1052,13 @@
                 
                 const lootCount = e.type === "boss" ? 8 : 2 + Math.floor(Math.random() * 3);
                 for (let k = 0; k < lootCount; k++) {
+                  const lootType = Math.random() < 0.15 ? "gem" : "coin";
                   this.loots.push({
                     x: e.x + randRange(-12, 12),
                     y: e.y + randRange(-12, 12),
-                    type: Math.random() < 0.15 ? "gem" : "coin",
+                    type: lootType,
                     value: 1,
-                    radius: 7,
+                    radius: lootType === "gem" ? 9 : 7,
                     age: 0,
                     lifetime: 30
                   });
@@ -1781,7 +1790,7 @@
       document.addEventListener("keydown", e => {
         if (!window.game || !window.game.world) return;
         
-        if (e.key === "F12" || e.key === "`") {
+        if (e.key.toLowerCase() === "m") {
           e.preventDefault();
           if (window.game.devConsole) window.game.devConsole.toggle();
         }
@@ -1865,8 +1874,10 @@
       
       window.game.world.paused = true;
       const playerCoins = Math.floor(window.game.world.player.coins);
+      const playerGems = Math.floor(window.game.world.player.gems);
       
       document.getElementById("shopCoins").textContent = playerCoins;
+      document.getElementById("shopGems").textContent = playerGems;
       this.populateShop(playerCoins);
       this.elements.shopScreen.style.display = "flex";
     },
@@ -1908,6 +1919,16 @@
           }}
         ],
         utility: [
+          // Add gem selling option
+          { name: "Sell Gem", desc: "Get 25 coins for 1 gem", cost: 0, apply: () => { 
+            if (world.player.gems >= 1) {
+              world.player.gems -= 1;
+              world.player.coins += 25;
+              UI.showToast("Sold 1 gem for 25 coins!");
+            } else {
+              UI.showToast("Not enough gems!");
+            }
+          }},
           { name: "Speed +18%", desc: "Move faster", cost: 75, apply: () => { 
             world.player.speedMul += 0.18;
           }},
