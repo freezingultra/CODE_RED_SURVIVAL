@@ -1,4 +1,4 @@
-// game.js - Code Red: Survival - COMPLETE WITH SUPABASE GLOBAL LEADERBOARD
+// game.js - Code Red: Survival - COMPLETE WITH A* PATHFINDING
 (function() {
   "use strict";
 
@@ -6,14 +6,30 @@
   const SUPABASE_URL = 'https://fkbnpjbbiijlprdhjnad.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrYm5wamJiaWlqbHByZGhqbmFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE0ODI0NTQsImV4cCI6MjA3NzA1ODQ1NH0.a_qtutu3Lnbr4CIu_21gpqofiOjF_ihuaUE782weutk';
 
+  // Performance detection
+  const detectPerformance = () => {
+    const cores = navigator.hardwareConcurrency || 2;
+    const memory = navigator.deviceMemory || 2;
+    const isHighEnd = cores >= 8 && memory >= 8;
+    
+    return {
+      isHighEnd,
+      mapSize: isHighEnd ? 500 : 100,
+      pathRecalcInterval: isHighEnd ? 0.125 : 0.85
+    };
+  };
+
+  const perf = detectPerformance();
+  
   const CONFIG = {
     tileSize: 32,
-    mapW: 100,
-    mapH: 100,
+    mapW: perf.mapSize,
+    mapH: perf.mapSize,
     maxEnemies: 15,
     maxParticles: 100,
     maxBullets: 200,
-    spawnDelay: 5.0
+    spawnDelay: 5.0,
+    pathRecalcInterval: perf.pathRecalcInterval
   };
 
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -25,6 +41,8 @@
     warn: (...a) => console.warn("[GAME]", ...a),
     error: (...a) => console.error("[GAME]", ...a)
   };
+
+  Log.info(`Performance: ${perf.isHighEnd ? 'HIGH-END' : 'STANDARD'} - Map: ${CONFIG.mapW}x${CONFIG.mapH} - Path recalc: ${CONFIG.pathRecalcInterval}s`);
 
   // Developer Console
   class DevConsole {
@@ -160,7 +178,6 @@
         if (!window.game || !window.game.world) return 'Game not ready';
         if (!window.game.world.isRunning) return 'No wave active';
         window.game.world.endWave();
-        // Update leaderboard after skipping wave
         const w = window.game.world;
         if (!w.cheatsUsed) {
           Leaderboard.addScore(w.userName, w.wave, w.difficulty, w.player.kills);
@@ -467,7 +484,7 @@
     }
   }
 
-  // Enemy
+  // Enemy with A* Pathfinding
   class Enemy {
     constructor(x, y, type, hp, speed) {
       this.x = x;
@@ -480,6 +497,13 @@
       this.fireTimer = randRange(0.5, 2);
       this.bossSpawnTimer = 0;
       this.dead = false;
+      
+      // A* pathfinding properties
+      this.path = [];
+      this.pathIndex = 0;
+      this.pathRecalcTimer = 0;
+      this.usePathfinding = type !== "ranged"; // Ranged enemies don't use pathfinding
+      
       Log.info("Enemy spawned: " + type + " with " + Math.round(hp) + " HP");
     }
 
@@ -488,10 +512,10 @@
       const dx = p.x - this.x, dy = p.y - this.y;
       const d = Math.hypot(dx, dy) || 1;
 
-      let vx = (dx / d) * this.speed;
-      let vy = (dy / d) * this.speed;
+      let vx = 0, vy = 0;
 
       if (this.type === "ranged") {
+        // Ranged enemies: keep distance and shoot
         if (d > 175) {
           vx = (dx / d) * this.speed;
           vy = (dy / d) * this.speed;
@@ -517,8 +541,32 @@
         }
       } 
       else if (this.type === "boss") {
-        vx = (dx / d) * this.speed;
-        vy = (dy / d) * this.speed;
+        // Boss: use A* pathfinding
+        this.pathRecalcTimer += dt;
+        
+        if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
+          this.pathRecalcTimer = 0;
+          this.path = world.findPathAStar(this.x, this.y, p.x, p.y);
+          this.pathIndex = 0;
+        }
+        
+        if (this.path.length > 0 && this.pathIndex < this.path.length) {
+          const target = this.path[this.pathIndex];
+          const tdx = target.x - this.x;
+          const tdy = target.y - this.y;
+          const td = Math.hypot(tdx, tdy);
+          
+          if (td < 16) {
+            this.pathIndex++;
+          } else {
+            vx = (tdx / td) * this.speed;
+            vy = (tdy / td) * this.speed;
+          }
+        } else {
+          // Fallback to direct movement
+          vx = (dx / d) * this.speed;
+          vy = (dy / d) * this.speed;
+        }
         
         this.bossSpawnTimer += dt;
         if (this.bossSpawnTimer >= 10) {
@@ -536,6 +584,34 @@
           } else {
             Log.warn("Boss minion spawn skipped - too many enemies");
           }
+        }
+      }
+      else {
+        // Basic and other enemies: use A* pathfinding
+        this.pathRecalcTimer += dt;
+        
+        if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
+          this.pathRecalcTimer = 0;
+          this.path = world.findPathAStar(this.x, this.y, p.x, p.y);
+          this.pathIndex = 0;
+        }
+        
+        if (this.path.length > 0 && this.pathIndex < this.path.length) {
+          const target = this.path[this.pathIndex];
+          const tdx = target.x - this.x;
+          const tdy = target.y - this.y;
+          const td = Math.hypot(tdx, tdy);
+          
+          if (td < 16) {
+            this.pathIndex++;
+          } else {
+            vx = (tdx / td) * this.speed;
+            vy = (tdy / td) * this.speed;
+          }
+        } else {
+          // Fallback to direct movement if no path found
+          vx = (dx / d) * this.speed;
+          vy = (dy / d) * this.speed;
         }
       }
 
@@ -564,7 +640,6 @@
       ctx.fill();
       ctx.stroke();
 
-      // Add attack range circle around ranged enemies (300 radius)
       if (this.type === "ranged") {
         ctx.strokeStyle = "rgba(255, 153, 0, 0.3)";
         ctx.lineWidth = 1;
@@ -579,6 +654,18 @@
         ctx.fillRect(this.x - this.radius, this.y + this.radius + 6, barW, barH);
         ctx.fillStyle = "#ff3366";
         ctx.fillRect(this.x - this.radius, this.y + this.radius + 6, (this.hp / this.maxHp) * barW, barH);
+      }
+
+      // Debug: draw path
+      if (this.path.length > 0 && this.pathIndex < this.path.length) {
+        ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        for (let i = this.pathIndex; i < this.path.length; i++) {
+          ctx.lineTo(this.path[i].x, this.path[i].y);
+        }
+        ctx.stroke();
       }
     }
   }
@@ -680,6 +767,115 @@
         if (this.map[my * this.mapW + mx] === 1) return true;
       }
       return false;
+    }
+
+    findPathAStar(startX, startY, endX, endY) {
+      // Convert pixel coordinates to grid coordinates
+      const startTile = [Math.floor(startX / this.tileSize), Math.floor(startY / this.tileSize)];
+      const endTile = [Math.floor(endX / this.tileSize), Math.floor(endY / this.tileSize)];
+
+      // Validate start and end positions
+      if (startTile[0] < 0 || startTile[0] >= this.mapW || startTile[1] < 0 || startTile[1] >= this.mapH) return [];
+      if (endTile[0] < 0 || endTile[0] >= this.mapW || endTile[1] < 0 || endTile[1] >= this.mapH) return [];
+
+      // Heuristic function (Manhattan distance)
+      const heuristic = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+      
+      // Helper to create unique key for a tile
+      const keyFor = (tile) => tile[0] + ',' + tile[1];
+
+      // Create open set with starting tile
+      const openSet = [startTile];
+      const openSetKeys = new Set([keyFor(startTile)]);
+      const closedSet = new Set();
+      const cameFrom = {};
+      const gScore = { [keyFor(startTile)]: 0 };
+      const fScore = { [keyFor(startTile)]: heuristic(startTile, endTile) };
+
+      let iterations = 0;
+      const maxIterations = this.mapW * this.mapH * 2;// Limit iterations based on map size
+
+      while (openSet.length > 0 && iterations < maxIterations) {
+        iterations++;
+        
+        // Find node in openSet with lowest fScore
+        let currentIndex = 0;
+        let current = openSet[0];
+        let currentKey = keyFor(current);
+        let lowestF = fScore[currentKey] || Infinity;
+        
+        for (let i = 1; i < openSet.length; i++) {
+          const node = openSet[i];
+          const nodeKey = keyFor(node);
+          const nodeF = fScore[nodeKey] || Infinity;
+          if (nodeF < lowestF) {
+            current = node;
+            currentIndex = i;
+            currentKey = nodeKey;
+            lowestF = nodeF;
+          }
+        }
+
+        // Check if we reached the goal
+        if (current[0] === endTile[0] && current[1] === endTile[1]) {
+          // Reconstruct path
+          const path = [];
+          let currentInPath = current;
+          while (currentInPath) {
+            path.push({
+              x: currentInPath[0] * this.tileSize + this.tileSize / 2,
+              y: currentInPath[1] * this.tileSize + this.tileSize / 2
+            });
+            currentInPath = cameFrom[keyFor(currentInPath)];
+          }
+          return path.reverse();
+        }
+
+        // Move current from openSet to closedSet
+        openSet.splice(currentIndex, 1);
+        openSetKeys.delete(currentKey);
+        closedSet.add(currentKey);
+
+        // Check neighbors (4-directional movement)
+        const neighbors = [
+          [current[0] - 1, current[1]], // left
+          [current[0] + 1, current[1]], // right
+          [current[0], current[1] - 1], // up
+          [current[0], current[1] + 1]  // down
+        ];
+
+        for (const neighbor of neighbors) {
+          const neighborKey = keyFor(neighbor);
+          
+          // Skip if already evaluated
+          if (closedSet.has(neighborKey)) continue;
+          
+          // Check if neighbor is valid (within bounds and walkable)
+          if (neighbor[0] < 0 || neighbor[0] >= this.mapW || neighbor[1] < 0 || neighbor[1] >= this.mapH) 
+            continue;
+          
+          if (this.map[neighbor[1] * this.mapW + neighbor[0]] === 1) // wall
+            continue;
+
+          // Calculate tentative gScore
+          const tentativeGScore = (gScore[currentKey] || Infinity) + 1;
+
+          if (tentativeGScore < (gScore[neighborKey] || Infinity)) {
+            // This path to neighbor is better than any previous one
+            cameFrom[neighborKey] = current;
+            gScore[neighborKey] = tentativeGScore;
+            fScore[neighborKey] = tentativeGScore + heuristic(neighbor, endTile);
+
+            if (!openSetKeys.has(neighborKey)) {
+              openSet.push(neighbor);
+              openSetKeys.add(neighborKey);
+            }
+          }
+        }
+      }
+
+      // No path found - return empty array
+      return [];
     }
 
     spawnEnemy(type) {
@@ -798,11 +994,9 @@
       this.enemies = [];
       
       const sd = Save.load();
-      // Calculate coin reward: 20 + 2*(wave-1)
       const coinReward = 20 + 2 * (this.wave - 1);
       sd.coins += coinReward;
       this.player.coins += coinReward;
-      // Add 25 HP to player
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + 25);
       if (this.wave > sd.bestWave) sd.bestWave = this.wave;
       Save.save(sd);
@@ -1143,7 +1337,6 @@
       this.camera.x += (targetX - this.camera.x) * 0.1;
       this.camera.y += (targetY - this.camera.y) * 0.1;
       
-      // Update HTML HUD elements
       this.updateHTMLHUD();
       
       UI.updateHUD(this);
@@ -1153,12 +1346,10 @@
       if (this.isMultiplayer) return;
       
       try {
-        // Wave display
         if (document.getElementById('waveNumber')) {
           document.getElementById('waveNumber').textContent = this.wave;
         }
         
-        // Health bar
         if (document.getElementById('healthBar')) {
           const healthPercent = Math.max(0, (this.player.hp / this.player.maxHp) * 100);
           document.getElementById('healthBar').style.width = `${healthPercent}%`;
@@ -1166,7 +1357,6 @@
             healthPercent > 60 ? '#00ff88' : healthPercent > 30 ? '#ffaa00' : '#ff3366';
         }
         
-        // Coins and gems
         if (document.getElementById('coinCount')) {
           document.getElementById('coinCount').textContent = Math.floor(this.player.coins);
         }
@@ -1174,7 +1364,6 @@
           document.getElementById('gemCount').textContent = Math.floor(this.player.gems);
         }
         
-        // Armor display
         const armorDisplay = document.getElementById('armorDisplay');
         if (armorDisplay) {
           if (this.player.armor > 0) {
@@ -1238,10 +1427,8 @@
         ctx.fillStyle = "white";
         ctx.font = "bold 18px monospace";
         
-        // Modern HUD panel
         ctx.save();
         
-        // Background panel
         ctx.fillStyle = 'rgba(20, 20, 30, 0.85)';
         ctx.strokeStyle = '#00d9ff';
         ctx.lineWidth = 2;
@@ -1250,24 +1437,20 @@
         ctx.fill();
         ctx.stroke();
         
-        // Stats with modern styling
         ctx.font = 'bold 16px "Segoe UI", sans-serif';
         ctx.fillStyle = '#ffffff';
         
-        // Health with color coding
         const hpPercent = this.player.hp / this.player.maxHp;
         const hpColor = hpPercent > 0.6 ? '#00ff88' : hpPercent > 0.3 ? '#ffaa00' : '#ff3366';
         ctx.fillText('HEALTH:', 40, 45);
         ctx.fillStyle = hpColor;
         ctx.fillText(`${Math.round(this.player.hp)}/${this.player.maxHp}`, 120, 45);
         
-        // Coins
         ctx.fillStyle = '#ffffff';
         ctx.fillText('COINS:', 40, 70);
         ctx.fillStyle = '#ffdd00';
         ctx.fillText(Math.floor(this.player.coins), 120, 70);
         
-        // Kills
         ctx.fillStyle = '#ffffff';
         ctx.fillText('KILLS:', 40, 95);
         ctx.fillStyle = '#00d9ff';
@@ -1275,7 +1458,6 @@
         
         ctx.restore();
         
-        // Modern wave timer
         ctx.save();
         ctx.font = 'bold 22px "Segoe UI", sans-serif';
         ctx.fillStyle = 'rgba(0, 217, 255, 0.9)';
@@ -1415,84 +1597,6 @@
         });
       }
     }
-
-    findPathAStar(startX, startY, endX, endY) {
-      // Convert pixel coordinates to grid coordinates
-      const startTile = [Math.floor(startX / this.tileSize), Math.floor(startY / this.tileSize)];
-      const endTile = [Math.floor(endX / this.tileSize), Math.floor(endY / this.tileSize)];
-
-      // Heuristic function (Manhattan distance)
-      const heuristic = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
-
-      // Create open and closed sets
-      const openSet = [startTile];
-      const cameFrom = {};
-      const gScore = { [startTile]: 0 };
-      const fScore = { [startTile]: heuristic(startTile, endTile) };
-
-      while (openSet.length > 0) {
-        // Find node in openSet with lowest fScore
-        let current = openSet[0];
-        let currentIndex = 0;
-        for (let i = 1; i < openSet.length; i++) {
-          const node = openSet[i];
-          if (fScore[node] < fScore[current]) {
-            current = node;
-            currentIndex = i;
-          }
-        }
-
-        // Check if we reached the goal
-        if (current[0] === endTile[0] && current[1] === endTile[1]) {
-          // Reconstruct path
-          const path = [];
-          let temp = current;
-          while (temp) {
-            path.push({ x: temp[0] * this.tileSize + this.tileSize/2, y: temp[1] * this.tileSize + this.tileSize/2 });
-            temp = cameFrom[temp];
-          }
-          return path.reverse();
-        }
-
-        // Move current from openSet to closedSet
-        openSet.splice(currentIndex, 1);
-        const currentKey = current;
-
-        // Check neighbors
-        const neighbors = [
-          [current[0] - 1, current[1]], // left
-          [current[0] + 1, current[1]], // right
-          [current[0], current[1] - 1], // up
-          [current[0], current[1] + 1]  // down
-        ];
-
-        for (const neighbor of neighbors) {
-          // Check if neighbor is valid (within bounds and walkable)
-          if (neighbor[0] < 0 || neighbor[0] >= this.mapW || neighbor[1] < 0 || neighbor[1] >= this.mapH) 
-            continue;
-          
-          if (this.map[neighbor[1] * this.mapW + neighbor[0]] === 1) // wall
-            continue;
-
-          // Calculate tentative gScore
-          const tentativeGScore = gScore[currentKey] + 1;
-          const neighborKey = neighbor;
-
-          if (tentativeGScore < (gScore[neighborKey] || Infinity)) {
-            cameFrom[neighborKey] = currentKey;
-            gScore[neighborKey] = tentativeGScore;
-            fScore[neighborKey] = tentativeGScore + heuristic(neighbor, endTile);
-
-            if (!openSet.some(node => node[0] === neighbor[0] && node[1] === neighbor[1])) {
-              openSet.push(neighbor);
-            }
-          }
-        }
-      }
-
-      // No path found
-      return [];
-    }
   }
 
   // UI
@@ -1518,7 +1622,6 @@
         leaderboardScreen: this.createLeaderboardScreen()
       };
       
-      // Bind multiplayer button
       const multiplayerBtn = document.getElementById("multiplayerBtn");
       if (multiplayerBtn) {
         multiplayerBtn.addEventListener("click", () => {
@@ -1529,7 +1632,6 @@
         });
       }
       
-      // Bind leaderboard button
       const leaderboardBtn = document.getElementById("leaderboardBtn");
       if (leaderboardBtn) {
         leaderboardBtn.addEventListener("click", async () => {
@@ -1539,12 +1641,10 @@
         });
       }
       
-      // Bind login/logout button
       const logoutBtn = document.getElementById("logoutBtn");
       if (logoutBtn) {
         this.loginBtn = logoutBtn;
         
-        // Update button text based on login status
         if (window.game && window.game.world) {
           logoutBtn.innerHTML = "🚪 Logout";
         } else {
@@ -1919,7 +2019,6 @@
           }}
         ],
         utility: [
-          // Add gem selling option
           { name: "Sell Gem", desc: "Get 25 coins for 1 gem", cost: 0, apply: () => { 
             if (world.player.gems >= 1) {
               world.player.gems -= 1;
@@ -2003,7 +2102,6 @@
       
       Input.init(canvas);
       
-      // Handle login screen first - game doesn't load until login
       this.setupLoginScreen();
       
       window.game = this;
@@ -2014,7 +2112,6 @@
       const loginSubmitBtn = document.getElementById("loginSubmitBtn");
       const loginScreen = document.getElementById("loginScreen");
       
-      // Check if user is already logged in
       const savedUser = localStorage.getItem("codered-user");
       if (savedUser) {
         Log.info("User already logged in: " + savedUser);
@@ -2027,7 +2124,6 @@
       const handleLogin = () => {
         const name = loginInput.value.trim();
         
-        // Validation: at least 3 characters
         if (!name || name.length < 3) {
           loginInput.style.borderColor = "#ff3366";
           loginInput.placeholder = "Name must be at least 3 characters!";
@@ -2039,7 +2135,6 @@
           return;
         }
         
-        // Validation: no numbers allowed
         if (/\d/.test(name)) {
           loginInput.style.borderColor = "#ff3366";
           loginInput.placeholder = "No numbers allowed!";
@@ -2051,12 +2146,10 @@
           return;
         }
         
-        // Valid name - proceed
         this.isLoggedIn = true;
         localStorage.setItem("codered-user", name);
         PlayerCounter.addPlayer(name);
         
-        // Hide login screen and start loading
         loginScreen.style.display = "none";
         this.startLoading(name);
       };
@@ -2068,7 +2161,6 @@
         }
       });
       
-      // Focus the input field
       setTimeout(() => loginInput.focus(), 100);
     }
     
@@ -2118,6 +2210,7 @@
         }
       }, 100);
     }
+    
     loop() {
       if (!this.running) return;
       
@@ -2162,3 +2255,36 @@
     new Game();
   }
 })();
+
+class Enemy {
+  constructor(x, y, type, hp, speed) {
+    this.x = x;
+    this.y = y;
+    this.type = type;
+    this.hp = hp;
+    this.maxHp = hp;
+    this.speed = speed;
+    this.radius = type === "boss" ? 28 : 11;
+    this.fireTimer = randRange(0.5, 2);
+    this.bossSpawnTimer = 0;
+    this.dead = false;
+    
+    // A* pathfinding properties
+    this.path = [];
+    this.pathIndex = 0;
+    this.pathRecalcTimer = 0;
+    this.usePathfinding = type !== "ranged"; // Ranged enemies don't use pathfinding
+    
+    Log.info("Enemy spawned: " + type + " with " + Math.round(hp) + " HP");
+  }
+
+  calculatePath(world) {
+    this.path = world.findPathAStar(this.x, this.y, world.player.x, world.player.y);
+    if (this.path.length === 0) {
+      Log.warn("No path found for " + this.type + " enemy");
+    } else {
+      Log.info(`Path calculated for ${this.type}: ${this.path.length} nodes`);
+    }
+    this.pathIndex = 0;
+  }
+}
