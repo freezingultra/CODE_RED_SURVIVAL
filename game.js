@@ -507,6 +507,17 @@
       Log.info("Enemy spawned: " + type + " with " + Math.round(hp) + " HP");
     }
 
+    calculatePath(world) {
+      Log.info(`Calculating path for ${this.type} enemy`);
+      this.path = world.findPathAStar(this.x, this.y, world.player.x, world.player.y);
+      if (this.path.length === 0) {
+        Log.warn("No path found for " + this.type + " enemy");
+      } else {
+        Log.info(`Path calculated for ${this.type}: ${this.path.length} nodes`);
+      }
+      this.pathIndex = 0;
+    }
+
     update(dt, world) {
       const p = world.player;
       const dx = p.x - this.x, dy = p.y - this.y;
@@ -546,11 +557,11 @@
         
         if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
           this.pathRecalcTimer = 0;
-          this.path = world.findPathAStar(this.x, this.y, p.x, p.y);
-          this.pathIndex = 0;
+          this.calculatePath(world);
         }
         
         if (this.path.length > 0 && this.pathIndex < this.path.length) {
+          Log.info(`Enemy ${this.type} following path segment ${this.pathIndex}/${this.path.length}`);
           const target = this.path[this.pathIndex];
           const tdx = target.x - this.x;
           const tdy = target.y - this.y;
@@ -592,11 +603,11 @@
         
         if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
           this.pathRecalcTimer = 0;
-          this.path = world.findPathAStar(this.x, this.y, p.x, p.y);
-          this.pathIndex = 0;
+          this.calculatePath(world);
         }
         
         if (this.path.length > 0 && this.pathIndex < this.path.length) {
+          Log.info(`Enemy ${this.type} following path segment ${this.pathIndex}/${this.path.length}`);
           const target = this.path[this.pathIndex];
           const tdx = target.x - this.x;
           const tdy = target.y - this.y;
@@ -654,18 +665,6 @@
         ctx.fillRect(this.x - this.radius, this.y + this.radius + 6, barW, barH);
         ctx.fillStyle = "#ff3366";
         ctx.fillRect(this.x - this.radius, this.y + this.radius + 6, (this.hp / this.maxHp) * barW, barH);
-      }
-
-      // Debug: draw path
-      if (this.path.length > 0 && this.pathIndex < this.path.length) {
-        ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        for (let i = this.pathIndex; i < this.path.length; i++) {
-          ctx.lineTo(this.path[i].x, this.path[i].y);
-        }
-        ctx.stroke();
       }
     }
   }
@@ -769,114 +768,392 @@
       return false;
     }
 
-    findPathAStar(startX, startY, endX, endY) {
-      // Convert pixel coordinates to grid coordinates
-      const startTile = [Math.floor(startX / this.tileSize), Math.floor(startY / this.tileSize)];
-      const endTile = [Math.floor(endX / this.tileSize), Math.floor(endY / this.tileSize)];
+    // Working A* Pathfinding for Code Red: Survival
 
-      // Validate start and end positions
-      if (startTile[0] < 0 || startTile[0] >= this.mapW || startTile[1] < 0 || startTile[1] >= this.mapH) return [];
-      if (endTile[0] < 0 || endTile[0] >= this.mapW || endTile[1] < 0 || endTile[1] >= this.mapH) return [];
+findPathAStar(startX, startY, endX, endY) {
+  // Convert pixel coordinates to grid coordinates
+  const startTile = [Math.floor(startX / this.tileSize), Math.floor(startY / this.tileSize)];
+  const endTile = [Math.floor(endX / this.tileSize), Math.floor(endY / this.tileSize)];
 
-      // Heuristic function (Manhattan distance)
-      const heuristic = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+  // Validate start and end positions
+  if (startTile[0] < 0 || startTile[0] >= this.mapW || startTile[1] < 0 || startTile[1] >= this.mapH) {
+    console.warn("Start position out of bounds");
+    return [];
+  }
+  if (endTile[0] < 0 || endTile[0] >= this.mapW || endTile[1] < 0 || endTile[1] >= this.mapH) {
+    console.warn("End position out of bounds");
+    return [];
+  }
+
+  // Check if start or end is on a wall
+  if (this.map[startTile[1] * this.mapW + startTile[0]] === 1) {
+    console.warn("Start position is on a wall");
+    return [];
+  }
+  if (this.map[endTile[1] * this.mapW + endTile[0]] === 1) {
+    console.warn("End position is on a wall");
+    return [];
+  }
+
+  // Heuristic function (Manhattan distance)
+  const heuristic = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+  
+  // Helper to create unique key for a tile
+  const keyFor = (tile) => `${tile[0]},${tile[1]}`;
+
+  // Priority queue (open set)
+  const openSet = [];
+  const openSetKeys = new Set();
+  
+  // Closed set
+  const closedSet = new Set();
+  
+  // Track where we came from
+  const cameFrom = new Map();
+  
+  // Cost from start to each node
+  const gScore = new Map();
+  
+  // Estimated total cost from start to end through this node
+  const fScore = new Map();
+
+  // Initialize starting node
+  const startKey = keyFor(startTile);
+  openSet.push(startTile);
+  openSetKeys.add(startKey);
+  gScore.set(startKey, 0);
+  fScore.set(startKey, heuristic(startTile, endTile));
+
+  let iterations = 0;
+  const maxIterations = this.mapW * this.mapH; // Limit iterations
+
+  while (openSet.length > 0 && iterations < maxIterations) {
+    iterations++;
+    
+    // Find node with lowest fScore
+    let lowestIndex = 0;
+    let lowestF = fScore.get(keyFor(openSet[0])) || Infinity;
+    
+    for (let i = 1; i < openSet.length; i++) {
+      const currentF = fScore.get(keyFor(openSet[i])) || Infinity;
+      if (currentF < lowestF) {
+        lowestIndex = i;
+        lowestF = currentF;
+      }
+    }
+
+    const current = openSet[lowestIndex];
+    const currentKey = keyFor(current);
+
+    // Check if we reached the goal
+    if (current[0] === endTile[0] && current[1] === endTile[1]) {
+      // Reconstruct path
+      const path = [];
+      let node = current;
       
-      // Helper to create unique key for a tile
-      const keyFor = (tile) => tile[0] + ',' + tile[1];
+      while (node) {
+        path.unshift({
+          x: node[0] * this.tileSize + this.tileSize / 2,
+          y: node[1] * this.tileSize + this.tileSize / 2
+        });
+        node = cameFrom.get(keyFor(node));
+      }
+      
+      console.log(`A* found path with ${path.length} nodes in ${iterations} iterations`);
+      return path;
+    }
 
-      // Create open set with starting tile
-      const openSet = [startTile];
-      const openSetKeys = new Set([keyFor(startTile)]);
-      const closedSet = new Set();
-      const cameFrom = {};
-      const gScore = { [keyFor(startTile)]: 0 };
-      const fScore = { [keyFor(startTile)]: heuristic(startTile, endTile) };
+    // Move current from open to closed set
+    openSet.splice(lowestIndex, 1);
+    openSetKeys.delete(currentKey);
+    closedSet.add(currentKey);
 
-      let iterations = 0;
-      const maxIterations = this.mapW * this.mapH * 2;// Limit iterations based on map size
+    // Check all neighbors (4-directional: up, down, left, right)
+    const neighbors = [
+      [current[0] - 1, current[1]], // left
+      [current[0] + 1, current[1]], // right
+      [current[0], current[1] - 1], // up
+      [current[0], current[1] + 1]  // down
+    ];
 
-      while (openSet.length > 0 && iterations < maxIterations) {
-        iterations++;
-        
-        // Find node in openSet with lowest fScore
-        let currentIndex = 0;
-        let current = openSet[0];
-        let currentKey = keyFor(current);
-        let lowestF = fScore[currentKey] || Infinity;
-        
-        for (let i = 1; i < openSet.length; i++) {
-          const node = openSet[i];
-          const nodeKey = keyFor(node);
-          const nodeF = fScore[nodeKey] || Infinity;
-          if (nodeF < lowestF) {
-            current = node;
-            currentIndex = i;
-            currentKey = nodeKey;
-            lowestF = nodeF;
-          }
-        }
-
-        // Check if we reached the goal
-        if (current[0] === endTile[0] && current[1] === endTile[1]) {
-          // Reconstruct path
-          const path = [];
-          let currentInPath = current;
-          while (currentInPath) {
-            path.push({
-              x: currentInPath[0] * this.tileSize + this.tileSize / 2,
-              y: currentInPath[1] * this.tileSize + this.tileSize / 2
-            });
-            currentInPath = cameFrom[keyFor(currentInPath)];
-          }
-          return path.reverse();
-        }
-
-        // Move current from openSet to closedSet
-        openSet.splice(currentIndex, 1);
-        openSetKeys.delete(currentKey);
-        closedSet.add(currentKey);
-
-        // Check neighbors (4-directional movement)
-        const neighbors = [
-          [current[0] - 1, current[1]], // left
-          [current[0] + 1, current[1]], // right
-          [current[0], current[1] - 1], // up
-          [current[0], current[1] + 1]  // down
-        ];
-
-        for (const neighbor of neighbors) {
-          const neighborKey = keyFor(neighbor);
-          
-          // Skip if already evaluated
-          if (closedSet.has(neighborKey)) continue;
-          
-          // Check if neighbor is valid (within bounds and walkable)
-          if (neighbor[0] < 0 || neighbor[0] >= this.mapW || neighbor[1] < 0 || neighbor[1] >= this.mapH) 
-            continue;
-          
-          if (this.map[neighbor[1] * this.mapW + neighbor[0]] === 1) // wall
-            continue;
-
-          // Calculate tentative gScore
-          const tentativeGScore = (gScore[currentKey] || Infinity) + 1;
-
-          if (tentativeGScore < (gScore[neighborKey] || Infinity)) {
-            // This path to neighbor is better than any previous one
-            cameFrom[neighborKey] = current;
-            gScore[neighborKey] = tentativeGScore;
-            fScore[neighborKey] = tentativeGScore + heuristic(neighbor, endTile);
-
-            if (!openSetKeys.has(neighborKey)) {
-              openSet.push(neighbor);
-              openSetKeys.add(neighborKey);
-            }
-          }
-        }
+    for (const neighbor of neighbors) {
+      const neighborKey = keyFor(neighbor);
+      
+      // Skip if already evaluated
+      if (closedSet.has(neighborKey)) continue;
+      
+      // Check bounds
+      if (neighbor[0] < 0 || neighbor[0] >= this.mapW || 
+          neighbor[1] < 0 || neighbor[1] >= this.mapH) {
+        continue;
+      }
+      
+      // Check if walkable (not a wall)
+      if (this.map[neighbor[1] * this.mapW + neighbor[0]] === 1) {
+        continue;
       }
 
-      // No path found - return empty array
-      return [];
+      // Calculate tentative gScore
+      const tentativeG = (gScore.get(currentKey) || Infinity) + 1;
+
+      // Check if this path is better
+      if (!gScore.has(neighborKey) || tentativeG < gScore.get(neighborKey)) {
+        // This path is the best so far
+        cameFrom.set(neighborKey, current);
+        gScore.set(neighborKey, tentativeG);
+        fScore.set(neighborKey, tentativeG + heuristic(neighbor, endTile));
+
+        // Add to open set if not already there
+        if (!openSetKeys.has(neighborKey)) {
+          openSet.push(neighbor);
+          openSetKeys.add(neighborKey);
+        }
+      }
     }
+  }
+
+  // No path found
+  console.warn(`A* failed to find path after ${iterations} iterations`);
+  return [];
+}
+
+// Enemy class calculatePath method (use this in your Enemy class)
+calculatePath(world) {
+  this.path = world.findPathAStar(this.x, this.y, world.player.x, world.player.y);
+  this.pathIndex = 0;
+  
+  if (this.path.length > 0) {
+    console.log(`${this.type} enemy found path with ${this.path.length} waypoints`);
+  } else {
+    console.warn(`${this.type} enemy could not find path to player`);
+  }
+}
+
+// Enemy update method with A* pathfinding for ALL enemy types including ranged
+update(dt, world) {
+  const p = world.player;
+  const dx = p.x - this.x, dy = p.y - this.y;
+  const d = Math.hypot(dx, dy) || 1;
+
+  let vx = 0, vy = 0;
+
+  if (this.type === "ranged") {
+    // Ranged enemies use pathfinding to maintain optimal distance (175 units)
+    const optimalDistance = 175;
+    const distanceError = d - optimalDistance;
+    
+    this.pathRecalcTimer += dt;
+    
+    // Recalculate path periodically or if distance is too different
+    if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval || Math.abs(distanceError) > 50) {
+      this.pathRecalcTimer = 0;
+      
+      // If too close, calculate path AWAY from player
+      if (d < optimalDistance - 30) {
+        // Calculate escape position: move away from player
+        const escapeAngle = Math.atan2(this.y - p.y, this.x - p.x);
+        const escapeDistance = 200;
+        const escapeX = this.x + Math.cos(escapeAngle) * escapeDistance;
+        const escapeY = this.y + Math.sin(escapeAngle) * escapeDistance;
+        
+        // Clamp escape position to map bounds
+        const clampedX = clamp(escapeX, 50, world.mapW * world.tileSize - 50);
+        const clampedY = clamp(escapeY, 50, world.mapH * world.tileSize - 50);
+        
+        this.path = world.findPathAStar(this.x, this.y, clampedX, clampedY);
+        this.pathIndex = 0;
+        console.log(`Ranged enemy retreating - too close (${Math.round(d)} units)`);
+      }
+      // If too far, calculate path TOWARD player
+      else if (d > optimalDistance + 30) {
+        // Move closer to player but not all the way
+        const approachAngle = Math.atan2(p.y - this.y, p.x - this.x);
+        const approachDistance = d - optimalDistance;
+        const targetX = this.x + Math.cos(approachAngle) * approachDistance;
+        const targetY = this.y + Math.sin(approachAngle) * approachDistance;
+        
+        this.path = world.findPathAStar(this.x, this.y, targetX, targetY);
+        this.pathIndex = 0;
+        console.log(`Ranged enemy approaching - too far (${Math.round(d)} units)`);
+      }
+      // If at good distance, try to find position with clear line of sight
+      else {
+        // Strafe perpendicular to player
+        const perpAngle = Math.atan2(p.y - this.y, p.x - this.x) + (Math.random() > 0.5 ? Math.PI/2 : -Math.PI/2);
+        const strafeDistance = 100;
+        const strafeX = this.x + Math.cos(perpAngle) * strafeDistance;
+        const strafeY = this.y + Math.sin(perpAngle) * strafeDistance;
+        
+        const clampedX = clamp(strafeX, 50, world.mapW * world.tileSize - 50);
+        const clampedY = clamp(strafeY, 50, world.mapH * world.tileSize - 50);
+        
+        this.path = world.findPathAStar(this.x, this.y, clampedX, clampedY);
+        this.pathIndex = 0;
+        console.log(`Ranged enemy strafing at optimal range (${Math.round(d)} units)`);
+      }
+    }
+    
+    // Follow the path if we have one
+    if (this.path.length > 0 && this.pathIndex < this.path.length) {
+      const target = this.path[this.pathIndex];
+      const tdx = target.x - this.x;
+      const tdy = target.y - this.y;
+      const td = Math.hypot(tdx, tdy);
+      
+      if (td < 20) {
+        this.pathIndex++;
+      } else {
+        vx = (tdx / td) * this.speed;
+        vy = (tdy / td) * this.speed;
+      }
+    } else {
+      // Fallback: maintain distance without pathfinding
+      if (d > optimalDistance + 20) {
+        vx = (dx / d) * this.speed;
+        vy = (dy / d) * this.speed;
+      } else if (d < optimalDistance - 20) {
+        vx = -(dx / d) * this.speed;
+        vy = -(dy / d) * this.speed;
+      }
+    }
+    
+    // Attack logic
+    if (d <= 175) {
+      this.fireTimer -= dt;
+      if (this.fireTimer <= 0) {
+        this.fireTimer = randRange(0.8, 1.5);
+        const dmg = 15 * (1 - (p.armor || 0));
+        p.hp -= dmg;
+        console.log(`RANGED ATTACK! Player took ${Math.round(dmg)} damage. HP: ${Math.round(p.hp)}`);
+        world.spawnParticles(p.x, p.y, 5, "#ff6600");
+        sfxHit();
+        
+        if (p.hp <= 0) {
+          world.gameOver();
+        }
+      }
+    }
+  } 
+  else if (this.type === "boss") {
+    // Boss: use A* pathfinding
+    this.pathRecalcTimer += dt;
+    
+    if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
+      this.pathRecalcTimer = 0;
+      this.calculatePath(world);
+    }
+    
+    if (this.path.length > 0 && this.pathIndex < this.path.length) {
+      const target = this.path[this.pathIndex];
+      const tdx = target.x - this.x;
+      const tdy = target.y - this.y;
+      const td = Math.hypot(tdx, tdy);
+      
+      if (td < 20) {
+        this.pathIndex++;
+      } else {
+        vx = (tdx / td) * this.speed;
+        vy = (tdy / td) * this.speed;
+      }
+    } else {
+      // Fallback to direct movement
+      vx = (dx / d) * this.speed;
+      vy = (dy / d) * this.speed;
+    }
+    
+    this.bossSpawnTimer += dt;
+    if (this.bossSpawnTimer >= 10) {
+      this.bossSpawnTimer = 0;
+      
+      if (world.enemies.length < CONFIG.maxEnemies - 5) {
+        console.log("BOSS SPAWNING MINIONS!");
+        for (let i = 0; i < 5; i++) {
+          const angle = (Math.PI * 2 / 5) * i;
+          const spawnDist = 80;
+          const spawnX = this.x + Math.cos(angle) * spawnDist;
+          const spawnY = this.y + Math.sin(angle) * spawnDist;
+          world.spawnEnemyAt(spawnX, spawnY, "basic", 50, 65);
+        }
+      } else {
+        console.warn("Boss minion spawn skipped - too many enemies");
+      }
+    }
+  }
+  else {
+    // Basic and other enemies: use A* pathfinding
+    this.pathRecalcTimer += dt;
+    
+    if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
+      this.pathRecalcTimer = 0;
+      this.calculatePath(world);
+    }
+    
+    if (this.path.length > 0 && this.pathIndex < this.path.length) {
+      const target = this.path[this.pathIndex];
+      const tdx = target.x - this.x;
+      const tdy = target.y - this.y;
+      const td = Math.hypot(tdx, tdy);
+      
+      if (td < 20) {
+        this.pathIndex++;
+      } else {
+        vx = (tdx / td) * this.speed;
+        vy = (tdy / td) * this.speed;
+      }
+    } else {
+      // Fallback to direct movement if no path found
+      vx = (dx / d) * this.speed;
+      vy = (dy / d) * this.speed;
+    }
+  }
+
+  // Apply movement
+  const newX = this.x + vx * dt;
+  const newY = this.y + vy * dt;
+
+  if (!world.checkCollision(newX, this.y, this.radius)) this.x = newX;
+  if (!world.checkCollision(this.x, newY, this.radius)) this.y = newY;
+
+  // Clamp to bounds
+  this.x = clamp(this.x, this.radius, world.mapW * world.tileSize - this.radius);
+  this.y = clamp(this.y, this.radius, world.mapH * world.tileSize - this.radius);
+}
+
+// EXAMPLE: How to visualize the path (add to Enemy.draw method for debugging)
+draw(ctx) {
+  // Draw enemy body
+  const colors = { 
+    basic: "#ff3366", 
+    ranged: "#ff6633", 
+    boss: "#aa0000" 
+  };
+  
+  ctx.fillStyle = colors[this.type] || "#ff3366";
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Draw attack range for ranged enemies
+  if (this.type === "ranged") {
+    ctx.strokeStyle = "rgba(255, 153, 0, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 175, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Draw health bar if damaged
+  if (this.hp < this.maxHp) {
+    const barW = this.radius * 2, barH = 4;
+    ctx.fillStyle = "rgba(0,0,0,0.8)";
+    ctx.fillRect(this.x - this.radius, this.y + this.radius + 6, barW, barH);
+    ctx.fillStyle = "#ff3366";
+    ctx.fillRect(this.x - this.radius, this.y + this.radius + 6, (this.hp / this.maxHp) * barW, barH);
+  }
+}
 
     spawnEnemy(type) {
       const px = this.player.x, py = this.player.y;
@@ -2279,6 +2556,7 @@ class Enemy {
   }
 
   calculatePath(world) {
+    Log.info(`Calculating path for ${this.type} enemy`);
     this.path = world.findPathAStar(this.x, this.y, world.player.x, world.player.y);
     if (this.path.length === 0) {
       Log.warn("No path found for " + this.type + " enemy");
