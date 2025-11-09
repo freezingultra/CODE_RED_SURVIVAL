@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
 
   <!-- ✅ SEO & Search Visibility -->
   <meta name="robots" content="index, follow">
@@ -45,6 +48,11 @@
       overflow: hidden;
       height: 100vh;
       width: 100vw;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: none;
+      position: fixed;
     }
     
     #game {
@@ -54,6 +62,8 @@
       height: 100%;
       cursor: crosshair;
       outline: none;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
     }
     
     .overlay {
@@ -319,6 +329,70 @@
   background-size: contain;
   background-blend-mode: overlay;
   }
+    /* Mobile Virtual Controls */
+    .mobile-controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: none;
+      z-index: 100;
+      pointer-events: none;
+    }
+    
+    .mobile-controls.active {
+      display: block !important;
+    }
+    
+    .virtual-joystick {
+      position: absolute;
+      bottom: 30px;
+      left: 30px;
+      width: 120px;
+      height: 120px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(0, 217, 255, 0.5);
+      border-radius: 50%;
+      pointer-events: all;
+      touch-action: none;
+    }
+    
+    .joystick-knob {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background: rgba(0, 217, 255, 0.7);
+      border: 2px solid #00d9ff;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: transform 0.1s;
+    }
+    
+    .shoot-button {
+      position: absolute;
+      bottom: 30px;
+      right: 30px;
+      width: 100px;
+      height: 100px;
+      background: rgba(255, 51, 102, 0.3);
+      border: 3px solid #ff3366;
+      border-radius: 50%;
+      pointer-events: all;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #fff;
+      font-weight: bold;
+    }
+    
+    .shoot-button:active {
+      background: rgba(255, 51, 102, 0.6);
+    }
+    
     /* Responsive media queries */
     @media (max-width: 768px) {
       .dialog {
@@ -331,11 +405,21 @@
       .hud-item {
         font-size: 12px;
       }
+      .mobile-controls {
+        display: block;
+      }
     }
     
     @media (max-height: 600px) {
       .dialog {
         transform: scale(0.9);
+      }
+    }
+    
+    @media (hover: none) and (pointer: coarse) {
+      /* Mobile devices */
+      .mobile-controls {
+        display: block;
       }
     }
   </style>
@@ -374,7 +458,7 @@
   <div id="homeScreen" class="overlay">
     <div class="dialog">
       <h1>⚠️ CODE RED ⚠️</h1>
-      <p style="color: #00d9ff; margin-bottom: 5px;">v1.0.68</p>
+      <p style="color: #00d9ff; margin-bottom: 5px;">v1.0.70</p>
       <h2>SURVIVAL</h2>
       <p style="color: #00d9ff; font-size: 16px;">Backrooms Edition</p>
       
@@ -581,6 +665,14 @@
       <p id="loadingText" style="color: #00d9ff; font-size: 18px; font-weight: bold;">0%</p>
       <p style="font-size: 14px; color: #888; margin-top: 10px;">Generating backrooms maze...</p>
     </div>
+  </div>
+
+  <!-- Mobile Virtual Controls -->
+  <div id="mobileControls" class="mobile-controls">
+    <div id="virtualJoystick" class="virtual-joystick">
+      <div id="joystickKnob" class="joystick-knob"></div>
+    </div>
+    <div id="shootButton" class="shoot-button">🔫</div>
   </div>
 
   <!-- Supabase Client Library -->
