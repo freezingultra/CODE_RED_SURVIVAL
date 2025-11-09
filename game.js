@@ -204,13 +204,40 @@
     }
   }
 
-  // Audio
+  // Audio - iOS compatible
   let audioCtx = null;
-  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
-  catch (e) { Log.warn("Audio not available"); }
+  let audioInitialized = false;
+  
+  function initAudioContext() {
+    if (audioInitialized && audioCtx) return audioCtx;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioInitialized = true;
+      // Resume audio context if suspended (iOS requirement)
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          Log.info("Audio context resumed");
+        }).catch(e => {
+          Log.warn("Audio resume failed:", e);
+        });
+      }
+    } catch (e) {
+      Log.warn("Audio not available:", e);
+    }
+    return audioCtx;
+  }
 
   function playSound(freq, duration) {
+    if (!audioCtx) {
+      audioCtx = initAudioContext();
     if (!audioCtx) return;
+    }
+    
+    // Resume if suspended (iOS requirement)
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(e => {});
+    }
+    
     try {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -221,7 +248,9 @@
       osc.start();
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
       osc.stop(audioCtx.currentTime + duration);
-    } catch (e) {}
+    } catch (e) {
+      // Silently fail on audio errors
+    }
   }
 
   function sfxShoot() { playSound(900, 0.05); }
@@ -352,18 +381,278 @@
 
   // Input
   const Input = {
-    keys: {}, mouse: { x: 0, y: 0, down: false },
+    keys: {}, 
+    mouse: { x: 0, y: 0, down: false },
+    touch: { active: false, x: 0, y: 0 },
+    joystick: { x: 0, y: 0, active: false },
+    isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
+    
     init(canvas) {
-      window.addEventListener("keydown", e => { this.keys[e.key.toLowerCase()] = true; if (e.key === " ") e.preventDefault(); });
-      window.addEventListener("keyup", e => { this.keys[e.key.toLowerCase()] = false; });
+      // Initialize virtual joystick for mobile
+      this.initVirtualJoystick();
+      this.initShootButton();
+      // Keyboard events
+      window.addEventListener("keydown", e => { 
+        this.keys[e.key.toLowerCase()] = true; 
+        if (e.key === " ") e.preventDefault(); 
+      });
+      window.addEventListener("keyup", e => { 
+        this.keys[e.key.toLowerCase()] = false; 
+      });
+      
+      // Mouse events
       canvas.addEventListener("mousemove", e => {
         const rect = canvas.getBoundingClientRect();
         this.mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
         this.mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
       });
-      canvas.addEventListener("mousedown", e => { if (e.button === 0) this.mouse.down = true; });
-      canvas.addEventListener("mouseup", e => { if (e.button === 0) this.mouse.down = false; });
+      canvas.addEventListener("mousedown", e => { 
+        if (e.button === 0) {
+          this.mouse.down = true;
+          this.initAudio(); // Initialize audio on first interaction (iOS requirement)
+        }
+      });
+      canvas.addEventListener("mouseup", e => { 
+        if (e.button === 0) this.mouse.down = false; 
+      });
+      canvas.addEventListener("mouseleave", e => {
+        this.mouse.down = false;
+      });
+      
+      // Touch events for iOS/mobile (for aiming/shooting, excluding joystick area)
+      let aimTouchId = null;
+      const isInControlArea = (clientX, clientY) => {
+        const joystick = document.getElementById('virtualJoystick');
+        const shootButton = document.getElementById('shootButton');
+        if (!joystick || !shootButton) return false;
+        
+        const joystickRect = joystick.getBoundingClientRect();
+        const shootRect = shootButton.getBoundingClientRect();
+        
+        // Check if touch is in joystick area (left side)
+        if (clientX >= joystickRect.left - 50 && clientX <= joystickRect.right + 50 &&
+            clientY >= joystickRect.top - 50 && clientY <= joystickRect.bottom + 50) {
+          return true;
+        }
+        
+        // Check if touch is in shoot button area (right side)
+        if (clientX >= shootRect.left - 50 && clientX <= shootRect.right + 50 &&
+            clientY >= shootRect.top - 50 && clientY <= shootRect.bottom + 50) {
+          return true;
+        }
+        
+        return false;
+      };
+      
+      canvas.addEventListener("touchstart", e => {
+        const touch = e.touches[0] || e.changedTouches[0];
+        if (!touch) return;
+        
+        // Don't handle touches in control areas (joystick/shoot button)
+        if (isInControlArea(touch.clientX, touch.clientY)) {
+          return;
+        }
+        
+        e.preventDefault();
+        this.initAudio(); // Initialize audio on first interaction (iOS requirement)
+        
+        const rect = canvas.getBoundingClientRect();
+        const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+        
+        // Treat touch as mouse for aiming and shooting
+        this.mouse.x = x;
+        this.mouse.y = y;
+        this.mouse.down = true;
+        this.touch.active = true;
+        this.touch.x = x;
+        this.touch.y = y;
+        aimTouchId = touch.identifier;
+      }, { passive: false });
+      
+      canvas.addEventListener("touchmove", e => {
+        const touch = Array.from(e.touches).find(t => t.identifier === aimTouchId) || 
+                     (e.changedTouches && e.changedTouches.find(t => t.identifier === aimTouchId));
+        if (!touch) return;
+        
+        // Don't handle touches in control areas
+        if (isInControlArea(touch.clientX, touch.clientY)) {
+          return;
+        }
+        
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+        
+        this.mouse.x = x;
+        this.mouse.y = y;
+        this.touch.x = x;
+        this.touch.y = y;
+      }, { passive: false });
+      
+      canvas.addEventListener("touchend", e => {
+        const touch = e.changedTouches.find(t => t.identifier === aimTouchId);
+        if (touch && isInControlArea(touch.clientX, touch.clientY)) {
+          return;
+        }
+        
+        e.preventDefault();
+        this.mouse.down = false;
+        this.touch.active = false;
+        aimTouchId = null;
+      }, { passive: false });
+      
+      canvas.addEventListener("touchcancel", e => {
+        e.preventDefault();
+        this.mouse.down = false;
+        this.touch.active = false;
+        aimTouchId = null;
+      }, { passive: false });
+      
       canvas.addEventListener("contextmenu", e => e.preventDefault());
+      
+      // Prevent default touch behaviors
+      document.addEventListener("touchmove", e => {
+        if (e.target === canvas || canvas.contains(e.target)) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+      
+      document.addEventListener("touchstart", e => {
+        if (e.target === canvas || canvas.contains(e.target)) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+    },
+    
+    initAudio() {
+      // Initialize audio context on user interaction (required for iOS)
+      initAudioContext();
+    },
+    
+    initVirtualJoystick() {
+      // Wait for DOM to be ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => this.initVirtualJoystick());
+        return;
+      }
+      
+      const joystick = document.getElementById('virtualJoystick');
+      const knob = document.getElementById('joystickKnob');
+      const mobileControls = document.getElementById('mobileControls');
+      
+      if (!joystick || !knob || !mobileControls) {
+        // Retry after a short delay if elements aren't ready
+        setTimeout(() => this.initVirtualJoystick(), 100);
+        return;
+      }
+      
+      // Don't show controls by default - they'll be shown when game starts
+      mobileControls.style.display = 'none';
+      
+      let joystickActive = false;
+      const joystickRect = { x: 0, y: 0, size: 120, radius: 60 };
+      const knobSize = 50;
+      const maxDistance = joystickRect.radius - knobSize / 2;
+      
+      const updateJoystickPosition = (clientX, clientY) => {
+        const rect = joystick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let dx = clientX - centerX;
+        let dy = clientY - centerY;
+        const distance = Math.hypot(dx, dy);
+        
+        if (distance > maxDistance) {
+          dx = (dx / distance) * maxDistance;
+          dy = (dy / distance) * maxDistance;
+        }
+        
+        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        
+        // Normalize to -1 to 1
+        this.joystick.x = dx / maxDistance;
+        this.joystick.y = dy / maxDistance;
+        this.joystick.active = true;
+      };
+      
+      const resetJoystick = () => {
+        knob.style.transform = 'translate(-50%, -50%)';
+        this.joystick.x = 0;
+        this.joystick.y = 0;
+        this.joystick.active = false;
+        joystickActive = false;
+      };
+      
+      joystick.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        joystickActive = true;
+        this.initAudio();
+        const touch = e.touches[0];
+        updateJoystickPosition(touch.clientX, touch.clientY);
+      }, { passive: false });
+      
+      joystick.addEventListener('touchmove', (e) => {
+        if (!joystickActive) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const touch = e.touches[0];
+        updateJoystickPosition(touch.clientX, touch.clientY);
+      }, { passive: false });
+      
+      joystick.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resetJoystick();
+      }, { passive: false });
+      
+      joystick.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resetJoystick();
+      }, { passive: false });
+    },
+    
+    initShootButton() {
+      // Wait for DOM to be ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => this.initShootButton());
+        return;
+      }
+      
+      const shootButton = document.getElementById('shootButton');
+      if (!shootButton) {
+        // Retry after a short delay if element isn't ready
+        setTimeout(() => this.initShootButton(), 100);
+        return;
+      }
+      
+      let shootActive = false;
+      
+      shootButton.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        shootActive = true;
+        this.mouse.down = true;
+        this.initAudio();
+      }, { passive: false });
+      
+      shootButton.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        shootActive = false;
+        this.mouse.down = false;
+      }, { passive: false });
+      
+      shootButton.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        shootActive = false;
+        this.mouse.down = false;
+      }, { passive: false });
     }
   };
 
@@ -400,10 +689,16 @@
     update(dt, world) {
       let mx = 0, my = 0;
       if (this.isP1) {
+        // Use virtual joystick on mobile, keyboard on desktop
+        if (Input.joystick.active) {
+          mx = Input.joystick.x;
+          my = Input.joystick.y;
+        } else {
         if (Input.keys['w']) my -= 1;
         if (Input.keys['s']) my += 1;
         if (Input.keys['a']) mx -= 1;
         if (Input.keys['d']) mx += 1;
+        }
       } else {
         if (Input.keys['arrowup']) my -= 1;
         if (Input.keys['arrowdown']) my += 1;
@@ -501,21 +796,62 @@
       // A* pathfinding properties
       this.path = [];
       this.pathIndex = 0;
-      this.pathRecalcTimer = 0;
-      this.usePathfinding = type !== "ranged"; // Ranged enemies don't use pathfinding
+      this.pathRecalcTimer = CONFIG.pathRecalcInterval; // Start with timer expired to calculate path immediately
+      this.hasCalculatedPath = false;
       
       Log.info("Enemy spawned: " + type + " with " + Math.round(hp) + " HP");
     }
 
-    calculatePath(world) {
-      Log.info(`Calculating path for ${this.type} enemy`);
-      this.path = world.findPathAStar(this.x, this.y, world.player.x, world.player.y);
-      if (this.path.length === 0) {
-        Log.warn("No path found for " + this.type + " enemy");
-      } else {
-        Log.info(`Path calculated for ${this.type}: ${this.path.length} nodes`);
+    calculatePath(world, targetX = null, targetY = null) {
+      const endX = targetX !== null ? targetX : world.player.x;
+      const endY = targetY !== null ? targetY : world.player.y;
+      
+      // Convert current position to tile coordinates for validation
+      const startTileX = Math.floor(this.x / world.tileSize);
+      const startTileY = Math.floor(this.y / world.tileSize);
+      
+      // If we're on a wall, try to find a nearby walkable tile
+      if (startTileX >= 0 && startTileX < world.mapW && startTileY >= 0 && startTileY < world.mapH &&
+          world.map[startTileY * world.mapW + startTileX] === 1) {
+        // Find nearest walkable tile
+        let found = false;
+        for (let radius = 1; radius <= 3 && !found; radius++) {
+          for (let tx = startTileX - radius; tx <= startTileX + radius && !found; tx++) {
+            for (let ty = startTileY - radius; ty <= startTileY + radius && !found; ty++) {
+              if (tx >= 0 && tx < world.mapW && ty >= 0 && ty < world.mapH) {
+                if (world.map[ty * world.mapW + tx] === 0) {
+                  this.x = tx * world.tileSize + world.tileSize / 2;
+                  this.y = ty * world.tileSize + world.tileSize / 2;
+                  found = true;
+                }
+              }
+            }
+          }
+        }
       }
+      
+      this.path = world.findPathAStar(this.x, this.y, endX, endY);
+      if (this.path.length === 0) {
+        // Only log if this is the first path calculation attempt
+        if (!this.hasCalculatedPath) {
+          Log.warn(`No path found for ${this.type} enemy`);
+        }
+      } else {
+        // Skip first node if it's too close to current position
+        if (this.path.length > 1) {
+          const firstNode = this.path[0];
+          const distToFirst = Math.hypot(firstNode.x - this.x, firstNode.y - this.y);
+          if (distToFirst < 10) {
+            this.pathIndex = 1;
+          } else {
+            this.pathIndex = 0;
+          }
+        } else {
       this.pathIndex = 0;
+        }
+      }
+      this.pathIndex = Math.max(0, Math.min(this.pathIndex, this.path.length - 1));
+      this.hasCalculatedPath = true;
     }
 
     update(dt, world) {
@@ -526,22 +862,52 @@
       let vx = 0, vy = 0;
 
       if (this.type === "ranged") {
-        // Ranged enemies: keep distance and shoot
-        if (d > 175) {
-          vx = (dx / d) * this.speed;
-          vy = (dy / d) * this.speed;
-        } else {
-          vx = 0;
-          vy = 0;
+        // Ranged enemies: use A* pathfinding (same logic as basic enemies)
+        this.pathRecalcTimer += dt;
+        
+        const needsRecalc = !this.hasCalculatedPath || 
+                           this.path.length === 0 || 
+                           this.pathIndex >= this.path.length || 
+                           this.pathRecalcTimer >= CONFIG.pathRecalcInterval;
+        
+        if (needsRecalc) {
+          this.pathRecalcTimer = 0;
+          this.calculatePath(world);
         }
         
-        if (d <= 175) {
+        if (this.path.length > 0 && this.pathIndex < this.path.length) {
+          const target = this.path[this.pathIndex];
+          const tdx = target.x - this.x;
+          const tdy = target.y - this.y;
+          const td = Math.hypot(tdx, tdy);
+          
+          if (td < 16) {
+            // Reached current node, move to next
+            this.pathIndex++;
+            // If we've reached the end of the path, recalculate
+            if (this.pathIndex >= this.path.length) {
+              this.pathRecalcTimer = CONFIG.pathRecalcInterval;
+            }
+          } else {
+            // Move toward current path node
+            vx = (tdx / td) * this.speed;
+            vy = (tdy / td) * this.speed;
+          }
+        } else {
+          // Fallback to direct movement if no path found
+          vx = (dx / d) * this.speed;
+          vy = (dy / d) * this.speed;
+        }
+        
+        // Attack if in range (ranged attack behavior)
+        const optimalDistance = 175;
+        if (d <= optimalDistance) {
           this.fireTimer -= dt;
           if (this.fireTimer <= 0) {
             this.fireTimer = randRange(0.8, 1.5);
             const dmg = 15 * (1 - (p.armor || 0));
             p.hp -= dmg;
-            Log.info("RANGED ATTACK! Player took " + Math.round(dmg) + " damage. HP: " + Math.round(p.hp));
+            Log.info(`RANGED ATTACK! Player took ${Math.round(dmg)} damage. HP: ${Math.round(p.hp)}`);
             world.spawnParticles(p.x, p.y, 5, "#ff6600");
             sfxHit();
             
@@ -555,21 +921,31 @@
         // Boss: use A* pathfinding
         this.pathRecalcTimer += dt;
         
-        if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
+        const needsRecalc = !this.hasCalculatedPath || 
+                           this.path.length === 0 || 
+                           this.pathIndex >= this.path.length || 
+                           this.pathRecalcTimer >= CONFIG.pathRecalcInterval;
+        
+        if (needsRecalc) {
           this.pathRecalcTimer = 0;
           this.calculatePath(world);
         }
         
         if (this.path.length > 0 && this.pathIndex < this.path.length) {
-          Log.info(`Enemy ${this.type} following path segment ${this.pathIndex}/${this.path.length}`);
           const target = this.path[this.pathIndex];
           const tdx = target.x - this.x;
           const tdy = target.y - this.y;
           const td = Math.hypot(tdx, tdy);
           
           if (td < 16) {
+            // Reached current node, move to next
             this.pathIndex++;
+            // If we've reached the end of the path, recalculate
+            if (this.pathIndex >= this.path.length) {
+              this.pathRecalcTimer = CONFIG.pathRecalcInterval;
+            }
           } else {
+            // Move toward current path node
             vx = (tdx / td) * this.speed;
             vy = (tdy / td) * this.speed;
           }
@@ -601,21 +977,31 @@
         // Basic and other enemies: use A* pathfinding
         this.pathRecalcTimer += dt;
         
-        if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
+        const needsRecalc = !this.hasCalculatedPath || 
+                           this.path.length === 0 || 
+                           this.pathIndex >= this.path.length || 
+                           this.pathRecalcTimer >= CONFIG.pathRecalcInterval;
+        
+        if (needsRecalc) {
           this.pathRecalcTimer = 0;
           this.calculatePath(world);
         }
         
         if (this.path.length > 0 && this.pathIndex < this.path.length) {
-          Log.info(`Enemy ${this.type} following path segment ${this.pathIndex}/${this.path.length}`);
           const target = this.path[this.pathIndex];
           const tdx = target.x - this.x;
           const tdy = target.y - this.y;
           const td = Math.hypot(tdx, tdy);
           
           if (td < 16) {
+            // Reached current node, move to next
             this.pathIndex++;
+            // If we've reached the end of the path, recalculate
+            if (this.pathIndex >= this.path.length) {
+              this.pathRecalcTimer = CONFIG.pathRecalcInterval;
+            }
           } else {
+            // Move toward current path node
             vx = (tdx / td) * this.speed;
             vy = (tdy / td) * this.speed;
           }
@@ -626,12 +1012,23 @@
         }
       }
 
+      // Apply movement with collision detection
+      if (vx !== 0 || vy !== 0) {
       const newX = this.x + vx * dt;
       const newY = this.y + vy * dt;
 
-      if (!world.checkCollision(newX, this.y, this.radius)) this.x = newX;
-      if (!world.checkCollision(this.x, newY, this.radius)) this.y = newY;
+        // Try to move in X direction
+        if (!world.checkCollision(newX, this.y, this.radius)) {
+          this.x = newX;
+        }
+        
+        // Try to move in Y direction
+        if (!world.checkCollision(this.x, newY, this.radius)) {
+          this.y = newY;
+        }
+      }
 
+      // Clamp to map bounds
       this.x = clamp(this.x, this.radius, world.mapW * world.tileSize - this.radius);
       this.y = clamp(this.y, this.radius, world.mapH * world.tileSize - this.radius);
     }
@@ -772,27 +1169,69 @@
 
 findPathAStar(startX, startY, endX, endY) {
   // Convert pixel coordinates to grid coordinates
-  const startTile = [Math.floor(startX / this.tileSize), Math.floor(startY / this.tileSize)];
-  const endTile = [Math.floor(endX / this.tileSize), Math.floor(endY / this.tileSize)];
+  let startTile = [Math.floor(startX / this.tileSize), Math.floor(startY / this.tileSize)];
+  let endTile = [Math.floor(endX / this.tileSize), Math.floor(endY / this.tileSize)];
 
-  // Validate start and end positions
-  if (startTile[0] < 0 || startTile[0] >= this.mapW || startTile[1] < 0 || startTile[1] >= this.mapH) {
-    console.warn("Start position out of bounds");
-    return [];
-  }
-  if (endTile[0] < 0 || endTile[0] >= this.mapW || endTile[1] < 0 || endTile[1] >= this.mapH) {
-    console.warn("End position out of bounds");
-    return [];
-  }
+  // Validate and clamp start position
+  startTile[0] = Math.max(0, Math.min(this.mapW - 1, startTile[0]));
+  startTile[1] = Math.max(0, Math.min(this.mapH - 1, startTile[1]));
+  
+  // Validate and clamp end position
+  endTile[0] = Math.max(0, Math.min(this.mapW - 1, endTile[0]));
+  endTile[1] = Math.max(0, Math.min(this.mapH - 1, endTile[1]));
 
-  // Check if start or end is on a wall
+  // If start is on a wall, find nearest walkable tile
   if (this.map[startTile[1] * this.mapW + startTile[0]] === 1) {
-    console.warn("Start position is on a wall");
-    return [];
+    let found = false;
+    for (let radius = 1; radius <= 3 && !found; radius++) {
+      for (let tx = startTile[0] - radius; tx <= startTile[0] + radius && !found; tx++) {
+        for (let ty = startTile[1] - radius; ty <= startTile[1] + radius && !found; ty++) {
+          if (tx >= 0 && tx < this.mapW && ty >= 0 && ty < this.mapH) {
+            if (this.map[ty * this.mapW + tx] === 0) {
+              startTile = [tx, ty];
+              found = true;
+            }
+          }
+        }
+      }
+    }
+    if (!found) return [];
   }
+
+  // If end is on a wall, find nearest walkable tile
   if (this.map[endTile[1] * this.mapW + endTile[0]] === 1) {
-    console.warn("End position is on a wall");
-    return [];
+    let found = false;
+    let bestDist = Infinity;
+    let bestTile = endTile;
+    
+    // Search in a spiral around the end position
+    for (let radius = 1; radius <= 5 && !found; radius++) {
+      for (let tx = endTile[0] - radius; tx <= endTile[0] + radius; tx++) {
+        for (let ty = endTile[1] - radius; ty <= endTile[1] + radius; ty++) {
+          if (tx >= 0 && tx < this.mapW && ty >= 0 && ty < this.mapH) {
+            if (this.map[ty * this.mapW + tx] === 0) {
+              const dist = Math.abs(tx - endTile[0]) + Math.abs(ty - endTile[1]);
+              if (dist < bestDist) {
+                bestDist = dist;
+                bestTile = [tx, ty];
+                found = true;
+              }
+            }
+          }
+        }
+      }
+      if (found) break;
+    }
+    if (!found) return [];
+    endTile = bestTile;
+  }
+  
+  // If start and end are the same, return direct path
+  if (startTile[0] === endTile[0] && startTile[1] === endTile[1]) {
+    return [{
+      x: endTile[0] * this.tileSize + this.tileSize / 2,
+      y: endTile[1] * this.tileSize + this.tileSize / 2
+    }];
   }
 
   // Heuristic function (Manhattan distance)
@@ -859,7 +1298,6 @@ findPathAStar(startX, startY, endX, endY) {
         node = cameFrom.get(keyFor(node));
       }
       
-      console.log(`A* found path with ${path.length} nodes in ${iterations} iterations`);
       return path;
     }
 
@@ -912,247 +1350,8 @@ findPathAStar(startX, startY, endX, endY) {
     }
   }
 
-  // No path found
-  console.warn(`A* failed to find path after ${iterations} iterations`);
+  // No path found (pathfinding failed - this is handled by the caller)
   return [];
-}
-
-// Enemy class calculatePath method (use this in your Enemy class)
-calculatePath(world) {
-  this.path = world.findPathAStar(this.x, this.y, world.player.x, world.player.y);
-  this.pathIndex = 0;
-  
-  if (this.path.length > 0) {
-    console.log(`${this.type} enemy found path with ${this.path.length} waypoints`);
-  } else {
-    console.warn(`${this.type} enemy could not find path to player`);
-  }
-}
-
-// Enemy update method with A* pathfinding for ALL enemy types including ranged
-update(dt, world) {
-  const p = world.player;
-  const dx = p.x - this.x, dy = p.y - this.y;
-  const d = Math.hypot(dx, dy) || 1;
-
-  let vx = 0, vy = 0;
-
-  if (this.type === "ranged") {
-    // Ranged enemies use pathfinding to maintain optimal distance (175 units)
-    const optimalDistance = 175;
-    const distanceError = d - optimalDistance;
-    
-    this.pathRecalcTimer += dt;
-    
-    // Recalculate path periodically or if distance is too different
-    if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval || Math.abs(distanceError) > 50) {
-      this.pathRecalcTimer = 0;
-      
-      // If too close, calculate path AWAY from player
-      if (d < optimalDistance - 30) {
-        // Calculate escape position: move away from player
-        const escapeAngle = Math.atan2(this.y - p.y, this.x - p.x);
-        const escapeDistance = 200;
-        const escapeX = this.x + Math.cos(escapeAngle) * escapeDistance;
-        const escapeY = this.y + Math.sin(escapeAngle) * escapeDistance;
-        
-        // Clamp escape position to map bounds
-        const clampedX = clamp(escapeX, 50, world.mapW * world.tileSize - 50);
-        const clampedY = clamp(escapeY, 50, world.mapH * world.tileSize - 50);
-        
-        this.path = world.findPathAStar(this.x, this.y, clampedX, clampedY);
-        this.pathIndex = 0;
-        console.log(`Ranged enemy retreating - too close (${Math.round(d)} units)`);
-      }
-      // If too far, calculate path TOWARD player
-      else if (d > optimalDistance + 30) {
-        // Move closer to player but not all the way
-        const approachAngle = Math.atan2(p.y - this.y, p.x - this.x);
-        const approachDistance = d - optimalDistance;
-        const targetX = this.x + Math.cos(approachAngle) * approachDistance;
-        const targetY = this.y + Math.sin(approachAngle) * approachDistance;
-        
-        this.path = world.findPathAStar(this.x, this.y, targetX, targetY);
-        this.pathIndex = 0;
-        console.log(`Ranged enemy approaching - too far (${Math.round(d)} units)`);
-      }
-      // If at good distance, try to find position with clear line of sight
-      else {
-        // Strafe perpendicular to player
-        const perpAngle = Math.atan2(p.y - this.y, p.x - this.x) + (Math.random() > 0.5 ? Math.PI/2 : -Math.PI/2);
-        const strafeDistance = 100;
-        const strafeX = this.x + Math.cos(perpAngle) * strafeDistance;
-        const strafeY = this.y + Math.sin(perpAngle) * strafeDistance;
-        
-        const clampedX = clamp(strafeX, 50, world.mapW * world.tileSize - 50);
-        const clampedY = clamp(strafeY, 50, world.mapH * world.tileSize - 50);
-        
-        this.path = world.findPathAStar(this.x, this.y, clampedX, clampedY);
-        this.pathIndex = 0;
-        console.log(`Ranged enemy strafing at optimal range (${Math.round(d)} units)`);
-      }
-    }
-    
-    // Follow the path if we have one
-    if (this.path.length > 0 && this.pathIndex < this.path.length) {
-      const target = this.path[this.pathIndex];
-      const tdx = target.x - this.x;
-      const tdy = target.y - this.y;
-      const td = Math.hypot(tdx, tdy);
-      
-      if (td < 20) {
-        this.pathIndex++;
-      } else {
-        vx = (tdx / td) * this.speed;
-        vy = (tdy / td) * this.speed;
-      }
-    } else {
-      // Fallback: maintain distance without pathfinding
-      if (d > optimalDistance + 20) {
-        vx = (dx / d) * this.speed;
-        vy = (dy / d) * this.speed;
-      } else if (d < optimalDistance - 20) {
-        vx = -(dx / d) * this.speed;
-        vy = -(dy / d) * this.speed;
-      }
-    }
-    
-    // Attack logic
-    if (d <= 175) {
-      this.fireTimer -= dt;
-      if (this.fireTimer <= 0) {
-        this.fireTimer = randRange(0.8, 1.5);
-        const dmg = 15 * (1 - (p.armor || 0));
-        p.hp -= dmg;
-        console.log(`RANGED ATTACK! Player took ${Math.round(dmg)} damage. HP: ${Math.round(p.hp)}`);
-        world.spawnParticles(p.x, p.y, 5, "#ff6600");
-        sfxHit();
-        
-        if (p.hp <= 0) {
-          world.gameOver();
-        }
-      }
-    }
-  } 
-  else if (this.type === "boss") {
-    // Boss: use A* pathfinding
-    this.pathRecalcTimer += dt;
-    
-    if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
-      this.pathRecalcTimer = 0;
-      this.calculatePath(world);
-    }
-    
-    if (this.path.length > 0 && this.pathIndex < this.path.length) {
-      const target = this.path[this.pathIndex];
-      const tdx = target.x - this.x;
-      const tdy = target.y - this.y;
-      const td = Math.hypot(tdx, tdy);
-      
-      if (td < 20) {
-        this.pathIndex++;
-      } else {
-        vx = (tdx / td) * this.speed;
-        vy = (tdy / td) * this.speed;
-      }
-    } else {
-      // Fallback to direct movement
-      vx = (dx / d) * this.speed;
-      vy = (dy / d) * this.speed;
-    }
-    
-    this.bossSpawnTimer += dt;
-    if (this.bossSpawnTimer >= 10) {
-      this.bossSpawnTimer = 0;
-      
-      if (world.enemies.length < CONFIG.maxEnemies - 5) {
-        console.log("BOSS SPAWNING MINIONS!");
-        for (let i = 0; i < 5; i++) {
-          const angle = (Math.PI * 2 / 5) * i;
-          const spawnDist = 80;
-          const spawnX = this.x + Math.cos(angle) * spawnDist;
-          const spawnY = this.y + Math.sin(angle) * spawnDist;
-          world.spawnEnemyAt(spawnX, spawnY, "basic", 50, 65);
-        }
-      } else {
-        console.warn("Boss minion spawn skipped - too many enemies");
-      }
-    }
-  }
-  else {
-    // Basic and other enemies: use A* pathfinding
-    this.pathRecalcTimer += dt;
-    
-    if (this.path.length === 0 || this.pathRecalcTimer >= CONFIG.pathRecalcInterval) {
-      this.pathRecalcTimer = 0;
-      this.calculatePath(world);
-    }
-    
-    if (this.path.length > 0 && this.pathIndex < this.path.length) {
-      const target = this.path[this.pathIndex];
-      const tdx = target.x - this.x;
-      const tdy = target.y - this.y;
-      const td = Math.hypot(tdx, tdy);
-      
-      if (td < 20) {
-        this.pathIndex++;
-      } else {
-        vx = (tdx / td) * this.speed;
-        vy = (tdy / td) * this.speed;
-      }
-    } else {
-      // Fallback to direct movement if no path found
-      vx = (dx / d) * this.speed;
-      vy = (dy / d) * this.speed;
-    }
-  }
-
-  // Apply movement
-  const newX = this.x + vx * dt;
-  const newY = this.y + vy * dt;
-
-  if (!world.checkCollision(newX, this.y, this.radius)) this.x = newX;
-  if (!world.checkCollision(this.x, newY, this.radius)) this.y = newY;
-
-  // Clamp to bounds
-  this.x = clamp(this.x, this.radius, world.mapW * world.tileSize - this.radius);
-  this.y = clamp(this.y, this.radius, world.mapH * world.tileSize - this.radius);
-}
-
-// EXAMPLE: How to visualize the path (add to Enemy.draw method for debugging)
-draw(ctx) {
-  // Draw enemy body
-  const colors = { 
-    basic: "#ff3366", 
-    ranged: "#ff6633", 
-    boss: "#aa0000" 
-  };
-  
-  ctx.fillStyle = colors[this.type] || "#ff3366";
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Draw attack range for ranged enemies
-  if (this.type === "ranged") {
-    ctx.strokeStyle = "rgba(255, 153, 0, 0.3)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, 175, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  // Draw health bar if damaged
-  if (this.hp < this.maxHp) {
-    const barW = this.radius * 2, barH = 4;
-    ctx.fillStyle = "rgba(0,0,0,0.8)";
-    ctx.fillRect(this.x - this.radius, this.y + this.radius + 6, barW, barH);
-    ctx.fillStyle = "#ff3366";
-    ctx.fillRect(this.x - this.radius, this.y + this.radius + 6, (this.hp / this.maxHp) * barW, barH);
-  }
 }
 
     spawnEnemy(type) {
@@ -1311,23 +1510,26 @@ draw(ctx) {
         this.spawnTimer += dt;
         if (this.spawnTimer >= 10) {
           this.spawnTimer = 0;
-          let x, y;
-          let attempts = 0;
-          do {
-            x = randRange(32, this.mapW * this.tileSize - 32);
-            y = randRange(32, this.mapH * this.tileSize - 32);
-            attempts++;
-          } while (this.checkCollision(x, y, 7) && attempts < 20);
-          if (attempts < 20) {
-            this.loots.push({
-              x: x,
-              y: y,
-              type: "health",
-              value: 50,
-              radius: 7,
-              age: 0,
-              lifetime: 30
-            });
+          
+          if (this.enemies.length < CONFIG.maxEnemies) {
+            let x, y;
+            let attempts = 0;
+            do {
+              x = randRange(32, this.mapW * this.tileSize - 32);
+              y = randRange(32, this.mapH * this.tileSize - 32);
+              attempts++;
+            } while (this.checkCollision(x, y, 7) && attempts < 20);
+            if (attempts < 20) {
+              this.loots.push({
+                x: x,
+                y: y,
+                type: "health",
+                value: 50,
+                radius: 7,
+                age: 0,
+                lifetime: 30
+              });
+            }
           }
         }
         
@@ -1694,7 +1896,7 @@ draw(ctx) {
         
         ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
         ctx.font = "14px monospace";
-        ctx.fillText("v1.0.7", w - 60, this.canvas.height - 10);
+        ctx.fillText("v1.0.70", w - 60, this.canvas.height - 10);
       } else {
         ctx.save();
         ctx.translate(-this.camera.x, -this.camera.y);
@@ -2132,7 +2334,16 @@ draw(ctx) {
       
       document.getElementById("startGameBtn").addEventListener("click", () => {
         this.hideAll();
-        if (window.game && window.game.world) window.game.world.startWave();
+        if (window.game && window.game.world) {
+          window.game.world.startWave();
+          // Show mobile controls when game starts (if mobile device)
+          const mobileControls = document.getElementById('mobileControls');
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+                          window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+          if (mobileControls && isMobile) {
+            mobileControls.style.display = "block";
+          }
+        }
       });
       
       document.getElementById("tutorialBtn").addEventListener("click", () => {
@@ -2147,7 +2358,16 @@ draw(ctx) {
       
       document.getElementById("tutorialStartBtn").addEventListener("click", () => {
         this.hideAll();
-        if (window.game && window.game.world) window.game.world.startWave();
+        if (window.game && window.game.world) {
+          window.game.world.startWave();
+          // Show mobile controls when game starts (if mobile device)
+          const mobileControls = document.getElementById('mobileControls');
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+                          window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+          if (mobileControls && isMobile) {
+            mobileControls.style.display = "block";
+          }
+        }
       });
       
       document.getElementById("resumeBtn").addEventListener("click", () => {
@@ -2161,7 +2381,16 @@ draw(ctx) {
       
       document.getElementById("shopCloseBtn").addEventListener("click", () => {
         this.elements.shopScreen.style.display = "none";
-        if (window.game && window.game.world) window.game.world.paused = false;
+        if (window.game && window.game.world) {
+          window.game.world.paused = false;
+          // Show mobile controls when shop closes (if game is running and mobile)
+          const mobileControls = document.getElementById('mobileControls');
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+                          window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+          if (mobileControls && isMobile && window.game.world.isRunning) {
+            mobileControls.style.display = "block";
+          }
+        }
       });
       
       document.addEventListener("keydown", e => {
@@ -2244,6 +2473,11 @@ draw(ctx) {
         document.getElementById("finalCoins").textContent = coins;
       }
       this.elements.gameOverScreen.style.display = "flex";
+      // Hide mobile controls when game over
+      const mobileControls = document.getElementById('mobileControls');
+      if (mobileControls) {
+        mobileControls.style.display = "none";
+      }
     },
     
     openShop() {
@@ -2257,6 +2491,11 @@ draw(ctx) {
       document.getElementById("shopGems").textContent = playerGems;
       this.populateShop(playerCoins);
       this.elements.shopScreen.style.display = "flex";
+      // Hide mobile controls when shop is open
+      const mobileControls = document.getElementById('mobileControls');
+      if (mobileControls) {
+        mobileControls.style.display = "none";
+      }
     },
     
     populateShop(playerCoins) {
@@ -2532,37 +2771,3 @@ draw(ctx) {
     new Game();
   }
 })();
-
-class Enemy {
-  constructor(x, y, type, hp, speed) {
-    this.x = x;
-    this.y = y;
-    this.type = type;
-    this.hp = hp;
-    this.maxHp = hp;
-    this.speed = speed;
-    this.radius = type === "boss" ? 28 : 11;
-    this.fireTimer = randRange(0.5, 2);
-    this.bossSpawnTimer = 0;
-    this.dead = false;
-    
-    // A* pathfinding properties
-    this.path = [];
-    this.pathIndex = 0;
-    this.pathRecalcTimer = 0;
-    this.usePathfinding = type !== "ranged"; // Ranged enemies don't use pathfinding
-    
-    Log.info("Enemy spawned: " + type + " with " + Math.round(hp) + " HP");
-  }
-
-  calculatePath(world) {
-    Log.info(`Calculating path for ${this.type} enemy`);
-    this.path = world.findPathAStar(this.x, this.y, world.player.x, world.player.y);
-    if (this.path.length === 0) {
-      Log.warn("No path found for " + this.type + " enemy");
-    } else {
-      Log.info(`Path calculated for ${this.type}: ${this.path.length} nodes`);
-    }
-    this.pathIndex = 0;
-  }
-}
