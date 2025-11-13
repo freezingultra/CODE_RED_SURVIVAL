@@ -656,6 +656,32 @@
     }
   };
 
+  // Permanent Upgrades Storage
+  const PermanentUpgrades = {
+    key: "codered-upgrades",
+    load() {
+      try {
+        const data = localStorage.getItem(this.key);
+        return data ? JSON.parse(data) : this.getDefaults();
+      } catch (e) { return this.getDefaults(); }
+    },
+    getDefaults() {
+      return {
+        redGems: 0,
+        baseDamage: 0,
+        fireRateBonus: 0,
+        maxHpBonus: 0,
+        armorBonus: 0,
+        speedBonus: 0,
+        unlockedWeapons: [0]
+      };
+    },
+    save(data) {
+      try { localStorage.setItem(this.key, JSON.stringify(data)); }
+      catch (e) {}
+    }
+  };
+
   // Player
   class Player {
     constructor(x, y, isP1 = true) {
@@ -667,12 +693,20 @@
       this.maxHp = 100;
       this.coins = 0;
       this.gems = 0;
+      this.redGems = 0;
       this.kills = 0;
       this.weaponIndex = 0;
       this.weapons = [
         { name: "Pistol", dmg: 18, bullets: 1, spread: 4, fireRate: 0.22 },
         { name: "Shotgun", dmg: 10, bullets: 5, spread: 18, fireRate: 0.85 },
-        { name: "Burst", dmg: 12, bullets: 3, spread: 6, fireRate: 0.45 }
+        { name: "Burst", dmg: 12, bullets: 3, spread: 6, fireRate: 0.45 },
+        { name: "Sniper", dmg: 75, bullets: 1, spread: 0.5, fireRate: 0.9 },
+        { name: "Railgun", dmg: 0, bullets: 1, spread: 0, fireRate: 60, isMelee: false, isRailgun: true },
+        { name: "SMG", dmg: 8, bullets: 1, spread: 6, fireRate: 0.08 },
+        { name: "Flamethrower", dmg: 6, bullets: 6, spread: 20, fireRate: 0.12 },
+        { name: "Plasma", dmg: 40, bullets: 1, spread: 2, fireRate: 0.6 },
+        { name: "LaserSweep", dmg: 25, bullets: 1, spread: 0.5, fireRate: 1.5 },
+        { name: "Rocket", dmg: 120, bullets: 1, spread: 3, fireRate: 1.8 }
       ];
       this.unlockedWeapons = [0];
       this.shootCooldown = 0;
@@ -684,6 +718,41 @@
       this.canShoot = true;
       this.magAmmo = 0;
       this.reloadTimer = 0;
+      this.railgunSpinAngle = 0;
+      
+      // Apply permanent upgrades if this is player 1
+      if (isP1) {
+        this.applyPermanentUpgrades();
+      }
+    }
+
+    applyPermanentUpgrades() {
+      const upgrades = PermanentUpgrades.load();
+      
+      // Apply damage bonus to all weapons
+      this.weapons.forEach(w => {
+        if (w.dmg > 0) w.dmg += upgrades.baseDamage;
+      });
+      
+      // Apply fire rate bonus
+      this.weapons.forEach(w => {
+        if (w.fireRate > 0 && w.fireRate < 60) {
+          w.fireRate *= (1 - upgrades.fireRateBonus);
+        }
+      });
+      
+      // Apply max HP bonus
+      this.maxHp += upgrades.maxHpBonus;
+      this.hp = this.maxHp;
+      
+      // Apply armor bonus
+      this.armor = upgrades.armorBonus;
+      
+      // Apply speed bonus
+      this.speedMul = 1 + upgrades.speedBonus;
+      
+      // Apply unlocked weapons
+      this.unlockedWeapons = [...upgrades.unlockedWeapons];
     }
 
     update(dt, world) {
@@ -733,6 +802,38 @@
     fire(world) {
       const weapon = this.weapons[this.weaponIndex];
       if (weapon.magSize !== undefined && (this.magAmmo <= 0 || this.reloadTimer > 0)) return;
+      
+      // Special Railgun handling
+      if (weapon.isRailgun) {
+        if (this.shootCooldown > 0) return;
+        this.shootCooldown = weapon.fireRate;
+        
+        // Create spinning laser
+        const numLasers = 8;
+        for (let i = 0; i < numLasers; i++) {
+          const angle = (Math.PI * 2 / numLasers) * i + this.railgunSpinAngle;
+          world.bullets.push({
+            x: this.x,
+            y: this.y,
+            vx: 0,
+            vy: 0,
+            dmg: 150,
+            owner: "player",
+            radius: 6,
+            travel: 0,
+            maxTravel: Infinity,
+            isLaser: true,
+            angle: angle,
+            lifetime: 0.5,
+            age: 0,
+            source: this
+          });
+        }
+        this.railgunSpinAngle += 0.3;
+        sfxShoot();
+        return;
+      }
+      
       this.shootCooldown = weapon.fireRate;
       const angle = Math.atan2(Input.mouse.y + world.camera.y - this.y, Input.mouse.x + world.camera.x - this.x);
 
@@ -761,21 +862,77 @@
     }
 
     draw(ctx) {
-      ctx.fillStyle = this.color;
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      const barW = 36, barH = 5;
-      ctx.fillStyle = "rgba(0,0,0,0.8)";
-      ctx.fillRect(this.x - barW/2, this.y + 18, barW, barH);
+      ctx.save();
+      ctx.translate(this.x, this.y);
       
-      const hpPercent = this.hp / this.maxHp;
-      ctx.fillStyle = hpPercent > 0.6 ? "#00ff88" : hpPercent > 0.3 ? "#ffaa00" : "#ff3366";
-      ctx.fillRect(this.x - barW/2, this.y + 18, barW * hpPercent, barH);
+      // Orange aura/glow effect
+      const gradient = ctx.createRadialGradient(0, 0, this.radius, 0, 0, this.radius * 2);
+      gradient.addColorStop(0, 'rgba(255, 165, 0, 0.6)');  // Orange with 60% opacity
+      gradient.addColorStop(1, 'transparent');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius * 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Body with blue gradient
+      const bodyGradient = ctx.createRadialGradient(0, 0, this.radius * 0.7, 0, 0, this.radius);
+      bodyGradient.addColorStop(0, '#00a8ff');  // Light blue
+      bodyGradient.addColorStop(1, this.color);  // Original player color
+      
+      ctx.fillStyle = bodyGradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Health bar above player
+      if (this.hp < this.maxHp) {
+        const barWidth = 30;
+        const barHeight = 4;
+        const healthPercent = this.hp / this.maxHp;
+        
+        ctx.save();
+        ctx.translate(-barWidth/2, -this.radius - 10);
+        
+        // Background
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, barWidth, barHeight);
+        
+        // Health fill with gradient
+        const healthGradient = ctx.createLinearGradient(0, 0, barWidth * healthPercent, 0);
+        healthGradient.addColorStop(0, '#ff0000');
+        healthGradient.addColorStop(0.5, '#ff9900');
+        healthGradient.addColorStop(1, '#00ff00');
+        
+        ctx.fillStyle = healthGradient;
+        ctx.fillRect(0, 0, barWidth * healthPercent, barHeight);
+        
+        // Border
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, 0, barWidth, barHeight);
+        
+        ctx.restore();
+      }
+      
+      // Ammo counter (kept below player)
+      if (this.weapons[this.weaponIndex] && this.magAmmo > 0) {
+        ctx.save();
+        ctx.font = 'bold 12px Arial';
+        ctx.fillStyle = this.color;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${this.magAmmo}`, 0, this.radius + 15);
+        
+        // Reload indicator
+        if (this.reloadTimer > 0) {
+          ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+          ctx.fillText('RELOADING', 0, this.radius + 30);
+        }
+        
+        ctx.restore();
+      }
+      
+      ctx.restore();
     }
   }
 
@@ -1443,8 +1600,17 @@ findPathAStar(startX, startY, endX, endY) {
     }
 
     async gameOver() {
+      if (this.isRunning === false && this.paused === true) {
+        return; // Already called gameOver, prevent duplicate
+      }
       this.isRunning = false;
       this.paused = true;
+      
+      // Save red gems to permanent upgrades (only once)
+      const upgrades = PermanentUpgrades.load();
+      upgrades.redGems = (upgrades.redGems || 0) + (this.player.redGems || 0);
+      PermanentUpgrades.save(upgrades);
+      
       if (this.isMultiplayer) {
         UI.showGameOver(this.winner + " Wins!", 0, 0);
       } else {
@@ -1455,9 +1621,17 @@ findPathAStar(startX, startY, endX, endY) {
         
         if (!this.cheatsUsed) {
           await Leaderboard.addScore(this.userName, this.wave, this.difficulty, this.player.kills);
-          UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
+          if (this.player && this.player.hp <= 0) {
+            UI.showGameOver("YOU DIED!", this.player.kills, Math.floor(this.player.coins));
+          } else {
+            UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
+          }
         } else {
-          UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
+          if (this.player && this.player.hp <= 0) {
+            UI.showGameOver("YOU DIED!", this.player.kills, Math.floor(this.player.coins));
+          } else {
+            UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
+          }
           UI.showToast("⚠️ Cheats Used - Score Not Submitted to Leaderboard");
           Log.warn("Score not submitted - cheats were used");
         }
@@ -1661,6 +1835,77 @@ findPathAStar(startX, startY, endX, endY) {
       
       for (let i = this.bullets.length - 1; i >= 0; i--) {
         const b = this.bullets[i];
+        
+        if (b.isLaser) {
+          // Handle laser rendering and collision
+          const range = 1200;
+          const endX = b.source.x + Math.cos(b.angle) * range;
+          const endY = b.source.y + Math.sin(b.angle) * range;
+          
+          b.age += dt;
+          if (b.age >= b.lifetime) {
+            this.bullets.splice(i, 1);
+            continue;
+          }
+          
+          // Check collision with enemies
+          for (let j = this.enemies.length - 1; j >= 0; j--) {
+            const e = this.enemies[j];
+            const dx = e.x - b.source.x;
+            const dy = e.y - b.source.y;
+            const distToEnemy = Math.hypot(dx, dy);
+            
+            // Check if enemy is in front of laser
+            const dotProduct = dx * Math.cos(b.angle) + dy * Math.sin(b.angle);
+            if (dotProduct > 0 && dotProduct < range) {
+              // Check perpendicular distance
+              const perpDist = Math.abs(dx * Math.sin(b.angle) - dy * Math.cos(b.angle));
+              if (perpDist < e.radius + 15) {
+                e.hp -= b.dmg * dt * 10; // Continuous damage
+                if (e.hp <= 0) {
+                  e.dead = true;
+                  this.player.kills++;
+                  Log.info("ENEMY KILLED BY RAILGUN!");
+                  
+                  const lootCount = e.type === "boss" ? 12 : 4 + Math.floor(Math.random() * 4);
+                  for (let k = 0; k < lootCount; k++) {
+                    const rand = Math.random();
+                    let lootType = "coin";
+                    let value = 1;
+                    
+                    if (rand < 0.5) { // 50% - 1 red gem
+                      lootType = "redGem";
+                      value = 1;
+                    } else if (rand < 0.75) { // 25% - 4 red gems
+                      lootType = "redGem";
+                      value = 4;
+                    } else if (rand < 0.775) { // 2.5% - 400 red gems
+                      lootType = "redGem";
+                      value = 400;
+                    } else if (rand < 0.7750000067) { // 0.0000000067% - 600,000 red gems
+                      lootType = "redGem";
+                      value = 600000;
+                    }
+                    
+                    this.loots.push({
+                      x: e.x + randRange(-12, 12),
+                      y: e.y + randRange(-12, 12),
+                      type: lootType,
+                      value: value,
+                      radius: lootType === "redGem" ? 9 : 7,
+                      age: 0,
+                      lifetime: 30
+                    });
+                  }
+                  this.spawnParticles(e.x, e.y, 30, e.type === "boss" ? "#ff0000" : "#ff8888");
+                  sfxExplosion();
+                }
+              }
+            }
+          }
+          continue;
+        }
+        
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         b.travel += Math.hypot(b.vx * dt, b.vy * dt);
@@ -1723,15 +1968,39 @@ findPathAStar(startX, startY, endX, endY) {
                 this.player.kills++;
                 Log.info("ENEMY KILLED! Type: " + e.type);
                 
-                const lootCount = e.type === "boss" ? 8 : 2 + Math.floor(Math.random() * 3);
+                const lootCount = e.type === "boss" ? 14 : 4 + Math.floor(Math.random() * 4);
                 for (let k = 0; k < lootCount; k++) {
-                  const lootType = Math.random() < 0.15 ? "gem" : "coin";
+                  const rand = Math.random();
+                  let lootType = "coin";
+                  let value = 1;
+
+                  // Mostly coins, some green gems, and rare red gems
+                  if (rand < 0.50) { // 50% -> coins (small)
+                    lootType = "coin";
+                    value = 1 + Math.floor(Math.random() * 3); // 1-3 coins
+                  } else if (rand < 0.80) { // 30% -> green gem
+                    lootType = "gem";
+                    value = 1;
+                  } else if (rand < 0.85) { // 5% -> small red gem
+                    lootType = "redGem";
+                    value = 1;
+                  } else if (rand < 0.86) { // 1% -> 4 red gems
+                    lootType = "redGem";
+                    value = 4;
+                  } else if (rand < 0.86001) { // 0.001% -> 400 red gems (very rare)
+                    lootType = "redGem";
+                    value = 400;
+                  } else { // fallback to coin
+                    lootType = "coin";
+                    value = 1;
+                  }
+
                   this.loots.push({
                     x: e.x + randRange(-12, 12),
                     y: e.y + randRange(-12, 12),
                     type: lootType,
-                    value: 1,
-                    radius: lootType === "gem" ? 9 : 7,
+                    value: value,
+                    radius: lootType === "redGem" ? 9 : 7,
                     age: 0,
                     lifetime: 30
                   });
@@ -1799,6 +2068,8 @@ findPathAStar(startX, startY, endX, endY) {
             this.player.coins += l.value;
           } else if (l.type === "gem") {
             this.player.gems += l.value;
+          } else if (l.type === "redGem") {
+            this.player.redGems = (this.player.redGems || 0) + l.value;
           } else if (l.type === "health") {
             this.player.hp = Math.min(this.player.maxHp, this.player.hp + l.value);
           }
@@ -1841,6 +2112,9 @@ findPathAStar(startX, startY, endX, endY) {
         }
         if (document.getElementById('gemCount')) {
           document.getElementById('gemCount').textContent = Math.floor(this.player.gems);
+        }
+        if (document.getElementById('redGemCount')) {
+          document.getElementById('redGemCount').textContent = Math.floor(this.player.redGems);
         }
         
         const armorDisplay = document.getElementById('armorDisplay');
@@ -1985,8 +2259,8 @@ findPathAStar(startX, startY, endX, endY) {
       
       for (const l of this.loots) {
         const bounce = Math.abs(Math.sin(l.age * 5)) * 3;
-        ctx.fillStyle = l.type === "coin" ? "#ffdd00" : l.type === "gem" ? "#00ff88" : "#ff0000";
-        ctx.strokeStyle = l.type === "coin" ? "#ffaa00" : l.type === "gem" ? "#00cc66" : "#cc0000";
+        ctx.fillStyle = l.type === "coin" ? "#ffdd00" : l.type === "gem" ? "#00ff88" : l.type === "redGem" ? "#ff4444" : "#ff0000";
+        ctx.strokeStyle = l.type === "coin" ? "#ffaa00" : l.type === "gem" ? "#00cc66" : l.type === "redGem" ? "#cc0000" : "#aa0000";
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(l.x, l.y - bounce, l.radius, 0, Math.PI * 2);
@@ -1995,13 +2269,40 @@ findPathAStar(startX, startY, endX, endY) {
       }
       
       for (const b of this.bullets) {
-        ctx.fillStyle = b.owner === "player" ? "#ffff00" : "#ff3366";
-        ctx.strokeStyle = b.owner === "player" ? "#ffaa00" : "#aa0000";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        if (b.isLaser) {
+          // Draw spinning laser
+          const range = 1200;
+          const endX = b.source.x + Math.cos(b.angle) * range;
+          const endY = b.source.y + Math.sin(b.angle) * range;
+          
+          ctx.save();
+          ctx.globalAlpha = 0.8;
+          ctx.strokeStyle = "#00ff00";
+          ctx.lineWidth = 8;
+          ctx.lineCap = "round";
+          ctx.shadowColor = "#00ff00";
+          ctx.shadowBlur = 15;
+          ctx.beginPath();
+          ctx.moveTo(b.source.x, b.source.y);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          ctx.globalAlpha = 0.4;
+          ctx.strokeStyle = "#00aa00";
+          ctx.lineWidth = 15;
+          ctx.beginPath();
+          ctx.moveTo(b.source.x, b.source.y);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          ctx.fillStyle = b.owner === "player" ? "#ffff00" : "#ff3366";
+          ctx.strokeStyle = b.owner === "player" ? "#ffaa00" : "#aa0000";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
       }
       
       for (const e of this.enemies) e.draw(ctx);
@@ -2089,6 +2390,7 @@ findPathAStar(startX, startY, endX, endY) {
         pauseScreen: document.getElementById("pauseScreen"),
         gameOverScreen: document.getElementById("gameOverScreen"),
         shopScreen: document.getElementById("shopScreen"),
+        upgradesScreen: document.getElementById("upgradesScreen"),
         loadingScreen: document.getElementById("loadingScreen"),
         toast: document.getElementById("toast"),
         waveNumber: document.getElementById("waveNumber"),
@@ -2117,6 +2419,23 @@ findPathAStar(startX, startY, endX, endY) {
           this.elements.homeScreen.style.display = "none";
           this.elements.leaderboardScreen.style.display = "flex";
           await this.updateLeaderboard();
+        });
+      }
+      
+      const upgradesBtn = document.getElementById("upgradesBtn");
+      if (upgradesBtn) {
+        upgradesBtn.addEventListener("click", () => {
+          this.elements.homeScreen.style.display = "none";
+          this.elements.upgradesScreen.style.display = "flex";
+          this.populateUpgrades();
+        });
+      }
+      
+      const upgradesCloseBtn = document.getElementById("upgradesCloseBtn");
+      if (upgradesCloseBtn) {
+        upgradesCloseBtn.addEventListener("click", () => {
+          this.elements.upgradesScreen.style.display = "none";
+          this.elements.homeScreen.style.display = "flex";
         });
       }
       
@@ -2334,6 +2653,8 @@ findPathAStar(startX, startY, endX, endY) {
       
       document.getElementById("startGameBtn").addEventListener("click", () => {
         this.hideAll();
+        const shopBtn = document.getElementById("shopButton");
+        if (shopBtn) shopBtn.style.display = "block";
         if (window.game && window.game.world) {
           window.game.world.startWave();
           // Show mobile controls when game starts (if mobile device)
@@ -2358,6 +2679,8 @@ findPathAStar(startX, startY, endX, endY) {
       
       document.getElementById("tutorialStartBtn").addEventListener("click", () => {
         this.hideAll();
+        const shopBtn = document.getElementById("shopButton");
+        if (shopBtn) shopBtn.style.display = "block";
         if (window.game && window.game.world) {
           window.game.world.startWave();
           // Show mobile controls when game starts (if mobile device)
@@ -2393,6 +2716,14 @@ findPathAStar(startX, startY, endX, endY) {
         }
       });
       
+      const shopButton = document.getElementById("shopButton");
+      if (shopButton) {
+        shopButton.addEventListener("click", () => {
+          this.openShop();
+        });
+        shopButton.style.display = "none";
+      }
+      
       document.addEventListener("keydown", e => {
         if (!window.game || !window.game.world) return;
         
@@ -2414,14 +2745,15 @@ findPathAStar(startX, startY, endX, endY) {
         if (e.key.toLowerCase() === "q") {
           const world = window.game.world;
           if (!world.player.unlockedWeapons) world.player.unlockedWeapons = [0];
-          let nextIndex = (world.player.weaponIndex + 1) % 3;
+          let nextIndex = (world.player.weaponIndex + 1) % world.player.weapons.length;
           let attempts = 0;
-          while (!world.player.unlockedWeapons.includes(nextIndex) && attempts < 3) {
-            nextIndex = (nextIndex + 1) % 3;
+          while (!world.player.unlockedWeapons.includes(nextIndex) && attempts < world.player.weapons.length) {
+            nextIndex = (nextIndex + 1) % world.player.weapons.length;
             attempts++;
           }
           if (world.player.unlockedWeapons.includes(nextIndex)) {
             world.player.weaponIndex = nextIndex;
+            world.player.shootCooldown = 0; // Reset cooldown when switching weapons
             this.showToast("Switched to " + world.player.weapons[world.player.weaponIndex].name);
           }
         }
@@ -2432,6 +2764,8 @@ findPathAStar(startX, startY, endX, endY) {
       Object.values(this.elements).forEach(el => {
         if (el && el.style) el.style.display = "none";
       });
+      const shopBtn = document.getElementById("shopButton");
+      if (shopBtn) shopBtn.style.display = "none";
     },
     
     updateHomeStats() {
@@ -2450,7 +2784,30 @@ findPathAStar(startX, startY, endX, endY) {
       this.elements.healthBar.style.width = Math.max(0, (world.player.hp / world.player.maxHp) * 100) + "%";
       this.elements.coinCount.textContent = Math.floor(world.player.coins);
       this.elements.gemCount.textContent = Math.floor(world.player.gems);
+      
+      const redGemCount = document.getElementById('redGemCount');
+      if (redGemCount) {
+        redGemCount.textContent = Math.floor(world.player.redGems || 0);
+      }
+      
       this.elements.currentWeapon.textContent = world.player.weapons[world.player.weaponIndex].name;
+      
+      // Add or update the bottom left weapon display
+      let weaponDisplay = document.getElementById('bottomWeaponDisplay');
+      if (!weaponDisplay) {
+        weaponDisplay = document.createElement('div');
+        weaponDisplay.id = 'bottomWeaponDisplay';
+        weaponDisplay.style.position = 'fixed';
+        weaponDisplay.style.bottom = '20px';
+        weaponDisplay.style.left = '20px';
+        weaponDisplay.style.color = '#fff';
+        weaponDisplay.style.fontSize = '24px';
+        weaponDisplay.style.fontWeight = 'bold';
+        weaponDisplay.style.textShadow = '2px 2px 4px rgba(0,0,0,0.7)';
+        weaponDisplay.style.zIndex = '100';
+        document.body.appendChild(weaponDisplay);
+      }
+      weaponDisplay.textContent = world.player.weapons[world.player.weaponIndex].name;
       
       const armorDisplay = document.getElementById("armorDisplay");
       const armorBar = document.getElementById("armorBar");
@@ -2463,10 +2820,11 @@ findPathAStar(startX, startY, endX, endY) {
     },
     
     showGameOver(wave, kills, coins) {
+      // If wave is a string (custom message), show it but still display kills/coins if provided
       if (typeof wave === "string") {
         document.getElementById("finalWave").textContent = wave;
-        document.getElementById("finalKills").textContent = "";
-        document.getElementById("finalCoins").textContent = "";
+        document.getElementById("finalKills").textContent = typeof kills !== 'undefined' && kills !== null ? kills : "";
+        document.getElementById("finalCoins").textContent = typeof coins !== 'undefined' && coins !== null ? coins : "";
       } else {
         document.getElementById("finalWave").textContent = wave;
         document.getElementById("finalKills").textContent = kills;
@@ -2500,26 +2858,27 @@ findPathAStar(startX, startY, endX, endY) {
     
     populateShop(playerCoins) {
       const world = window.game.world;
-      
+      const perm = PermanentUpgrades.load();
+
+      // Define temporary in-game shop items (coins / green gems)
       const upgrades = {
+        weapons: [
+          { name: "Buy Shotgun (temp)", desc: "Use Shotgun this run", cost: 120, weaponIndex: 1 },
+          { name: "Buy Burst (temp)", desc: "Use Burst Rifle this run", cost: 140, weaponIndex: 2 },
+          { name: "Buy Sniper (temp)", desc: "Use Sniper this run", cost: 220, weaponIndex: 3 },
+          { name: "Buy Railgun (temp)", desc: "Temporary Railgun (short trial)", cost: 500, weaponIndex: 4 },
+          { name: "Buy SMG (temp)", desc: "Lightweight rapid-fire", cost: 90, weaponIndex: 5 },
+          { name: "Buy Flamethrower (temp)", desc: "Close-range crowd control", cost: 110, weaponIndex: 6 },
+          { name: "Buy Plasma (temp)", desc: "Heavy plasma bolts", cost: 180, weaponIndex: 7 },
+          { name: "Buy LaserSweep (temp)", desc: "Precision sweeping laser", cost: 150, weaponIndex: 8 },
+          { name: "Buy Rocket (temp)", desc: "High-damage rocket launcher", cost: 280, weaponIndex: 9 }
+        ],
         offense: [
           { name: "Damage +6", desc: "Pistol damage", cost: 55, apply: () => { 
             world.player.weapons[0].dmg += 6;
           }},
           { name: "Fire Rate", desc: "-12% cooldown", cost: 80, apply: () => { 
             world.player.weapons.forEach(w => w.fireRate *= 0.88);
-          }},
-          { name: "Unlock Shotgun", desc: "Buy shotgun", cost: 150, apply: () => { 
-            if (!world.player.unlockedWeapons.includes(1)) {
-              world.player.unlockedWeapons.push(1);
-              UI.showToast("Shotgun unlocked!");
-            }
-          }},
-          { name: "Unlock Burst", desc: "Buy burst rifle", cost: 200, apply: () => { 
-            if (!world.player.unlockedWeapons.includes(2)) {
-              world.player.unlockedWeapons.push(2);
-              UI.showToast("Burst unlocked!");
-            }
           }}
         ],
         defense: [
@@ -2527,21 +2886,18 @@ findPathAStar(startX, startY, endX, endY) {
             world.player.maxHp += 25; 
             world.player.hp += 25;
           }},
-          { name: "Armor 12%", desc: "Damage reduction", cost: 130, apply: () => { 
-            world.player.armor = Math.min(0.75, world.player.armor + 0.12);
-          }},
           { name: "Health Pack", desc: "Restore 60 HP", cost: 45, apply: () => { 
             world.player.hp = Math.min(world.player.maxHp, world.player.hp + 60);
           }}
         ],
         utility: [
-          { name: "Sell Gem", desc: "Get 25 coins for 1 gem", cost: 0, apply: () => { 
+          { name: "Exchange Gem", desc: "1 Green Gem = 25 coins", cost: 1, costType: "gem", apply: () => { 
             if (world.player.gems >= 1) {
               world.player.gems -= 1;
               world.player.coins += 25;
-              UI.showToast("Sold 1 gem for 25 coins!");
+              UI.showToast("Exchanged 1 Green Gem for 25 coins!");
             } else {
-              UI.showToast("Not enough gems!");
+              UI.showToast("Not enough Green Gems!");
             }
           }},
           { name: "Speed +18%", desc: "Move faster", cost: 75, apply: () => { 
@@ -2555,36 +2911,284 @@ findPathAStar(startX, startY, endX, endY) {
           }}
         ]
       };
-      
+
+      // Weapons: temporary buys go into weapons list area
+      const weaponsContainer = document.getElementById("weaponsUpgradesShop") || document.getElementById("weaponsUpgrades");
+      if (weaponsContainer) {
+        weaponsContainer.innerHTML = "";
+        upgrades.weapons.forEach(u => {
+          const div = document.createElement("div");
+          div.className = "shop-item";
+          const permOwned = (perm.unlockedWeapons || []).includes(u.weaponIndex);
+          const canAfford = playerCoins >= u.cost;
+
+          div.innerHTML = `<h4>${u.name}</h4><p>${u.desc}</p><p style='color: #ffdd00;'>${u.cost} 🪙</p>`;
+          const btn = document.createElement("button");
+          if (permOwned) {
+            btn.textContent = "Purchased (Permanent)";
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+          } else {
+            btn.textContent = "Buy";
+            btn.disabled = !canAfford;
+            if (!canAfford) { btn.style.opacity = "0.5"; btn.style.cursor = "not-allowed"; }
+            btn.onclick = () => {
+              if (world.player.coins >= u.cost) {
+                world.player.coins -= u.cost;
+                // give temporary access for this run
+                if (!world.player.unlockedWeapons.includes(u.weaponIndex)) world.player.unlockedWeapons.push(u.weaponIndex);
+                document.getElementById("shopCoins").textContent = Math.floor(world.player.coins);
+                UI.showToast(`Bought ${u.name} for this run!`);
+                UI.populateShop(Math.floor(world.player.coins));
+              } else {
+                UI.showToast("Not enough coins!");
+              }
+            };
+          }
+          div.appendChild(btn);
+          weaponsContainer.appendChild(div);
+        });
+      }
+
       ["offense", "defense", "utility"].forEach(category => {
         const container = document.getElementById(category + "Upgrades");
+        if (!container) return;
         container.innerHTML = "";
         
         upgrades[category].forEach(u => {
           const div = document.createElement("div");
           div.className = "shop-item";
-          div.innerHTML = "<h4>" + u.name + "</h4><p>" + u.desc + "</p><p style='color: #ffdd00;'>" + u.cost + " coins</p>";
+          
+          const costType = u.costType || "coins";
+          const costColor = costType === "gem" ? "#00ff88" : "#ffdd00";
+          const costSymbol = costType === "gem" ? "💎" : "🪙";
+          
+          let canAfford = false;
+          if (costType === "coins") {
+            canAfford = playerCoins >= u.cost;
+          } else if (costType === "gem") {
+            canAfford = world.player.gems >= u.cost;
+          }
+          
+          div.innerHTML = `<h4>${u.name}</h4><p>${u.desc}</p><p style='color: ${costColor};'>${u.cost} ${costSymbol}</p>`;
           
           const btn = document.createElement("button");
           btn.textContent = "Buy";
-          btn.disabled = playerCoins < u.cost;
-          if (playerCoins < u.cost) {
+          btn.disabled = !canAfford;
+          if (!canAfford) {
             btn.style.opacity = "0.5";
             btn.style.cursor = "not-allowed";
           }
           
           btn.onclick = () => {
-            if (world.player.coins >= u.cost) {
+            const costType = u.costType || "coins";
+            let canBuy = false;
+            
+            if (costType === "coins" && world.player.coins >= u.cost) {
               world.player.coins -= u.cost;
+              canBuy = true;
+            } else if (costType === "gem" && world.player.gems >= u.cost) {
+              world.player.gems -= u.cost;
+              canBuy = true;
+            }
+            
+            if (canBuy) {
               document.getElementById("shopCoins").textContent = Math.floor(world.player.coins);
+              document.getElementById("shopGems").textContent = Math.floor(world.player.gems);
               u.apply();
               UI.showToast("Bought " + u.name + "!");
-              btn.disabled = true;
-              btn.textContent = "Purchased";
-              btn.style.opacity = "0.5";
               UI.populateShop(Math.floor(world.player.coins));
+            } else {
+              UI.showToast("Not enough " + costType + "!");
             }
           };
+          div.appendChild(btn);
+          container.appendChild(div);
+        });
+      });
+    },
+    
+    populateUpgrades() {
+      const world = window.game.world;
+      const upgrades = PermanentUpgrades.load();
+      
+      document.getElementById("upgradesRedGems").textContent = Math.floor(upgrades.redGems || 0);
+      
+      const upgradeDefs = {
+        weapons: [
+          { name: "Unlock Shotgun", weaponIndex: 1, desc: "Semi-auto shotgun", cost: 50, apply: () => { 
+            if (!upgrades.unlockedWeapons.includes(1)) {
+              upgrades.unlockedWeapons.push(1);
+              if (!world.player.unlockedWeapons.includes(1)) {
+                world.player.unlockedWeapons.push(1);
+              }
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("Shotgun unlocked! Carry over to all games!");
+            }
+          }},
+          { name: "Unlock Burst", weaponIndex: 2, desc: "Burst rifle - 3 shots", cost: 100, apply: () => { 
+            if (!upgrades.unlockedWeapons.includes(2)) {
+              upgrades.unlockedWeapons.push(2);
+              if (!world.player.unlockedWeapons.includes(2)) {
+                world.player.unlockedWeapons.push(2);
+              }
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("Burst Rifle unlocked! Carry over to all games!");
+            }
+          }},
+          { name: "Unlock Sniper", weaponIndex: 3, desc: "High damage, precise", cost: 200, apply: () => { 
+            if (!upgrades.unlockedWeapons.includes(3)) {
+              upgrades.unlockedWeapons.push(3);
+              if (!world.player.unlockedWeapons.includes(3)) {
+                world.player.unlockedWeapons.push(3);
+              }
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("Sniper unlocked! Carry over to all games!");
+            }
+          }},
+          { name: "Unlock Railgun", weaponIndex: 4, desc: "🚀 ULTIMATE! Spinning laser", cost: 700, apply: () => { 
+            if (!upgrades.unlockedWeapons.includes(4)) {
+              upgrades.unlockedWeapons.push(4);
+              if (!world.player.unlockedWeapons.includes(4)) {
+                world.player.unlockedWeapons.push(4);
+              }
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("🚀 RAILGUN UNLOCKED! Ultimate power!");
+            }
+          }}
+          ,{ name: "Unlock SMG", desc: "Lightweight SMG", cost: 60, apply: () => {
+            if (!upgrades.unlockedWeapons.includes(5)) {
+              upgrades.unlockedWeapons.push(5);
+              if (!world.player.unlockedWeapons.includes(5)) world.player.unlockedWeapons.push(5);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("SMG unlocked! Carry over to all games!");
+            }
+          }},
+          { name: "Unlock Flamethrower", desc: "Close-range crowd control", cost: 90, apply: () => {
+            if (!upgrades.unlockedWeapons.includes(6)) {
+              upgrades.unlockedWeapons.push(6);
+              if (!world.player.unlockedWeapons.includes(6)) world.player.unlockedWeapons.push(6);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("Flamethrower unlocked! Carry over to all games!");
+            }
+          }},
+          { name: "Unlock Plasma", desc: "Heavy plasma bolt", cost: 160, apply: () => {
+            if (!upgrades.unlockedWeapons.includes(7)) {
+              upgrades.unlockedWeapons.push(7);
+              if (!world.player.unlockedWeapons.includes(7)) world.player.unlockedWeapons.push(7);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("Plasma unlocked! Carry over to all games!");
+            }
+          }},
+          { name: "Unlock Laser Sweep", desc: "Precision sweeping laser", cost: 140, apply: () => {
+            if (!upgrades.unlockedWeapons.includes(8)) {
+              upgrades.unlockedWeapons.push(8);
+              if (!world.player.unlockedWeapons.includes(8)) world.player.unlockedWeapons.push(8);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("Laser Sweep unlocked! Carry over to all games!");
+            }
+          }},
+          { name: "Unlock Rocket", desc: "High-damage rocket launcher", cost: 240, apply: () => {
+            if (!upgrades.unlockedWeapons.includes(9)) {
+              upgrades.unlockedWeapons.push(9);
+              if (!world.player.unlockedWeapons.includes(9)) world.player.unlockedWeapons.push(9);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("Rocket unlocked! Carry over to all games!");
+            }
+          }}
+        ],
+        defense: [
+          { name: "Max HP +25", desc: "Permanent +25 health", cost: 40, apply: () => { 
+            upgrades.maxHpBonus += 25;
+            world.player.maxHp += 25;
+            world.player.hp = world.player.maxHp;
+            PermanentUpgrades.save(upgrades);
+          }},
+          { name: "Max HP +50", desc: "Permanent +50 health", cost: 80, apply: () => { 
+            upgrades.maxHpBonus += 50;
+            world.player.maxHp += 50;
+            world.player.hp = world.player.maxHp;
+            PermanentUpgrades.save(upgrades);
+          }},
+          { name: "Armor +12%", desc: "Permanent damage reduction", cost: 75, apply: () => { 
+            upgrades.armorBonus = Math.min(0.75, upgrades.armorBonus + 0.12);
+            world.player.armor = Math.min(0.75, world.player.armor + 0.12);
+            PermanentUpgrades.save(upgrades);
+          }},
+          { name: "Armor +24%", desc: "Strong damage reduction", cost: 150, apply: () => { 
+            upgrades.armorBonus = Math.min(0.75, upgrades.armorBonus + 0.24);
+            world.player.armor = Math.min(0.75, world.player.armor + 0.24);
+            PermanentUpgrades.save(upgrades);
+          }}
+        ],
+        utility: [
+          { name: "Damage +10", desc: "Permanent +10 all weapons", cost: 60, apply: () => { 
+            upgrades.baseDamage += 10;
+            world.player.weapons.forEach(w => { if (w.dmg > 0) w.dmg += 10; });
+            PermanentUpgrades.save(upgrades);
+          }},
+          { name: "Fire Rate +15%", desc: "Permanent faster fire rate", cost: 120, apply: () => { 
+            upgrades.fireRateBonus += 0.15;
+            world.player.weapons.forEach(w => { 
+              if (w.fireRate > 0 && w.fireRate < 60) w.fireRate *= 0.85;
+            });
+            PermanentUpgrades.save(upgrades);
+          }},
+          { name: "Speed +25%", desc: "Permanent movement boost", cost: 100, apply: () => { 
+            upgrades.speedBonus += 0.25;
+            world.player.speedMul += 0.25;
+            PermanentUpgrades.save(upgrades);
+          }},
+          { name: "Speed +50%", desc: "Major permanent speed boost", cost: 200, apply: () => { 
+            upgrades.speedBonus += 0.50;
+            world.player.speedMul += 0.50;
+            PermanentUpgrades.save(upgrades);
+          }}
+        ]
+      };
+      
+      ["weapons", "defense", "utility"].forEach(category => {
+        let containerId = category + "Upgrades";
+        if (category === "defense") containerId = "permanentDefenseUpgrades";
+        if (category === "utility") containerId = "permanentUtilityUpgrades";
+        
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = "";
+        
+        upgradeDefs[category].forEach(u => {
+          const div = document.createElement("div");
+          div.className = "shop-item";
+          const canAfford = (upgrades.redGems || 0) >= u.cost;
+          const isOwned = (u.weaponIndex !== undefined) && (upgrades.unlockedWeapons || []).includes(u.weaponIndex);
+
+          div.innerHTML = `<h4>${u.name}</h4><p>${u.desc}</p><p style='color: #ff4444;'>${u.cost} 🔴</p>`;
+
+          const btn = document.createElement("button");
+          if (isOwned) {
+            btn.textContent = "Purchased";
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+          } else {
+            btn.textContent = "Buy";
+            btn.disabled = !canAfford;
+            if (!canAfford) { btn.style.opacity = "0.5"; btn.style.cursor = "not-allowed"; }
+
+            btn.onclick = () => {
+              if ((upgrades.redGems || 0) >= u.cost) {
+                upgrades.redGems = (upgrades.redGems || 0) - u.cost;
+                PermanentUpgrades.save(upgrades);
+                document.getElementById("upgradesRedGems").textContent = Math.floor(upgrades.redGems || 0);
+                u.apply();
+                UI.showToast("Bought " + u.name + "! Permanent upgrade!");
+                UI.populateUpgrades();
+              } else {
+                UI.showToast("Not enough Red Gems!");
+              }
+            };
+          }
           div.appendChild(btn);
           container.appendChild(div);
         });
