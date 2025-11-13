@@ -506,15 +506,22 @@
       <span id="gemCount" style="color: #00ff88; font-weight: bold;">0</span>
     </div>
     <div class="hud-item">
+      <span>🔴 <strong>Red Gems</strong></span>
+      <span id="redGemCount" style="color: #ff4444; font-weight: bold;">0</span>
+    </div>
+    <div class="hud-item">
       <span>🔫 <strong>Weapon</strong></span>
       <span id="currentWeapon" style="color: #ff6600; font-weight: bold;">Pistol</span>
     </div>
+    <button id="shopButton" style="position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: linear-gradient(135deg, #ffdd00, #ffaa00); color: #000; border: 2px solid #ffaa00; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; z-index: 500; transition: all 0.3s; box-shadow: 0 4px 15px rgba(255, 221, 0, 0.4);">
+      🛒 SHOP (F)
+    </button>
   </div>
   
   <div id="homeScreen" class="overlay">
     <div class="dialog">
       <h1>⚠️ CODE RED ⚠️</h1>
-      <p style="color: #00d9ff; margin-bottom: 5px;">v1.0.70</p>
+      <p style="color: #00d9ff; margin-bottom: 5px;">v1.0.72</p>
       <h2>SURVIVAL</h2>
       <p style="color: #00d9ff; font-size: 16px;">Backrooms Edition</p>
       
@@ -534,6 +541,7 @@
       <div style="margin: 10px 0;">
         <button id="multiplayerBtn">🎮 Multiplayer</button>
         <button id="leaderboardBtn">🏆 Leaderboard</button>
+        <button id="upgradesBtn">⭐ Upgrades</button>
         <button id="logoutBtn">🚪 Logout</button>
       </div>
       
@@ -598,6 +606,17 @@
           <li><strong>Pistol</strong> - 18 damage, 0.22s cooldown, accurate (unlocked by default)</li>
           <li><strong>Shotgun</strong> - 10 damage × 5 pellets, 0.85s cooldown, wide spread (150 coins)</li>
           <li><strong>Burst Rifle</strong> - 12 damage × 3 bullets, 0.45s cooldown, medium spread (200 coins)</li>
+          <li><strong>Sniper</strong> - 75 damage, 0.9s cooldown, single shot (400 coins)</li>
+          <li><strong>Railgun</strong> - ULTIMATE! Spins 8 lasers, infinite damage to all enemies, 60s cooldown (700 gems)</li>
+        </ul>
+        
+        <h3>💎 Permanent Upgrades & Gems</h3>
+        <ul>
+          <li><strong>Red Gems</strong> - Premium currency dropped by enemies</li>
+          <li><strong>Drop Rates</strong>: 50% = 1 gem, 25% = 4 gems, 2.5% = 400 gems, 0.0000000067% = 600,000 gems!</li>
+          <li><strong>Permanent Upgrades</strong> - All upgrades are permanent! Speed, Armor, Damage, Health, etc.</li>
+          <li><strong>Unlocked Weapons</strong> - Once purchased, weapons stay unlocked forever</li>
+          <li><strong>Exchange Rate</strong> - Sell gems for coins or use gems for premium upgrades</li>
         </ul>
         
         <h3>💡 Pro Tips</h3>
@@ -651,30 +670,40 @@
   </div>
   
   <div id="shopScreen" class="overlay" style="display: none;">
-    <div class="dialog" style="max-width: 950px;">
-      <h2>🛒 Shop & Upgrades</h2>
-      <p style="font-size: 20px;">
+    <div class="dialog" style="max-width: 1200px; max-height: 90vh; overflow-y: auto;">
+      <h2>🛒 In-Game Shop</h2>
+      <p style="font-size: 20px; margin-bottom: 20px;">
         Your Coins: <span id="shopCoins" style="color: #ffdd00; font-weight: bold; font-size: 24px;">0</span> 🪙
         &nbsp;&nbsp;|&nbsp;&nbsp;
-        Your Gems: <span id="shopGems" style="color: #00ff88; font-weight: bold; font-size: 24px;">0</span> 💎
+        Your Green Gems: <span id="shopGems" style="color: #00ff88; font-weight: bold; font-size: 24px;">0</span> 💎
       </p>
       
-      <div class="shop-grid">
-        <div class="shop-category">
-          <h3 style="color: #ff6600;">⚔️ OFFENSE</h3>
-          <div id="offenseUpgrades"></div>
-        </div>
-        <div class="shop-category">
-          <h3 style="color: #00ff88;">🛡️ DEFENSE</h3>
-          <div id="defenseUpgrades"></div>
-        </div>
-        <div class="shop-category">
-          <h3 style="color: #ffdd00;">🔧 UTILITY</h3>
-          <div id="utilityUpgrades"></div>
-        </div>
+      <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 20px;">
+        <div id="weaponsUpgradesShop" style="grid-column: 1 / -1; display: contents;"></div>
+        <div id="offenseUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
+        <div id="defenseUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
+        <div id="utilityUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
       </div>
       
       <button id="shopCloseBtn" style="margin-top: 20px; font-size: 16px; padding: 10px 25px;">✖️ Close Shop</button>
+    </div>
+  </div>
+  
+  <div id="upgradesScreen" class="overlay" style="display: none;">
+    <div class="dialog" style="max-width: 1200px; max-height: 90vh; overflow-y: auto;">
+      <h2>⭐ Permanent Upgrades</h2>
+      <p style="font-size: 18px; color: #ccc; margin-bottom: 20px;">
+        Your Red Gems: <span id="upgradesRedGems" style="color: #ff4444; font-weight: bold; font-size: 22px;">0</span> 🔴
+      </p>
+      <p style="font-size: 14px; color: #aaa; margin-bottom: 20px;">These upgrades are PERMANENT and carry over to ALL future games!</p>
+      
+      <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 20px;">
+        <div id="weaponsUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
+        <div id="permanentDefenseUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
+        <div id="permanentUtilityUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
+      </div>
+      
+      <button id="upgradesCloseBtn" style="margin-top: 20px; font-size: 16px; padding: 10px 25px;">✖️ Close</button>
     </div>
   </div>
   
