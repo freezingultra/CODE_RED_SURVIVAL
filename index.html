@@ -510,6 +510,10 @@
       <span id="redGemCount" style="color: #ff4444; font-weight: bold;">0</span>
     </div>
     <div class="hud-item">
+      <span>🌈 <strong>Rainbow</strong></span>
+      <span id="rainbowCrystalCount" style="color: #ff00ff; font-weight: bold;">0</span>
+    </div>
+    <div class="hud-item">
       <span>🔫 <strong>Weapon</strong></span>
       <span id="currentWeapon" style="color: #ff6600; font-weight: bold;">Pistol</span>
     </div>
@@ -541,7 +545,10 @@
       <div style="margin: 10px 0;">
         <button id="multiplayerBtn">🎮 Multiplayer</button>
         <button id="leaderboardBtn">🏆 Leaderboard</button>
+        <button id="customizeBtn">🎨 Customize</button>
         <button id="upgradesBtn">⭐ Upgrades</button>
+        <button id="controlsBtn">⌨️ Controls</button>
+        <button id="promoBtn">🎟️ Promo Codes</button>
         <button id="logoutBtn">🚪 Logout</button>
       </div>
       
@@ -689,11 +696,40 @@
     </div>
   </div>
   
+  <div id="customizeScreen" class="overlay" style="display: none;">
+    <div class="dialog" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;">
+      <h2>🎨 Character Customization</h2>
+      <p style="font-size: 16px; color: #ccc; margin-bottom: 20px;">
+        Your Red Gems: <span id="customizeRedGems" style="color: #ff4444; font-weight: bold; font-size: 20px;">0</span> 🔴
+      </p>
+      
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
+        <div>
+          <h3 style="color: #00ff88; margin-bottom: 15px;">Primary Colors (Free)</h3>
+          <div id="primaryColors" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>
+        </div>
+        <div>
+          <h3 style="color: #ff4444; margin-bottom: 15px;">Secondary Colors (50 🔴 each)</h3>
+          <div id="secondaryColors" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>
+        </div>
+      </div>
+      
+      <div style="background: rgba(0,217,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: left;">
+        <h3 style="color: #00d9ff; margin-bottom: 10px;">Preview</h3>
+        <canvas id="colorPreview" width="100" height="100" style="background: rgba(0,0,0,0.3); border: 2px solid #00d9ff; border-radius: 8px;"></canvas>
+      </div>
+      
+      <button id="customizeCloseBtn" style="margin-top: 20px; font-size: 16px; padding: 10px 25px;">✖️ Close</button>
+    </div>
+  </div>
+  
   <div id="upgradesScreen" class="overlay" style="display: none;">
     <div class="dialog" style="max-width: 1200px; max-height: 90vh; overflow-y: auto;">
       <h2>⭐ Permanent Upgrades</h2>
       <p style="font-size: 18px; color: #ccc; margin-bottom: 20px;">
         Your Red Gems: <span id="upgradesRedGems" style="color: #ff4444; font-weight: bold; font-size: 22px;">0</span> 🔴
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        Your Rainbow Crystals: <span id="upgradesRainbowCrystals" style="color: #ff00ff; font-weight: bold; font-size: 22px;">0</span> 🌈
       </p>
       <p style="font-size: 14px; color: #aaa; margin-bottom: 20px;">These upgrades are PERMANENT and carry over to ALL future games!</p>
       
@@ -701,12 +737,71 @@
         <div id="weaponsUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
         <div id="permanentDefenseUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
         <div id="permanentUtilityUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
+        <div id="rainbowWeaponsUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
       </div>
       
       <button id="upgradesCloseBtn" style="margin-top: 20px; font-size: 16px; padding: 10px 25px;">✖️ Close</button>
     </div>
   </div>
   
+  <div id="controlsScreen" class="overlay" style="display: none;">
+    <div class="dialog" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+      <h2>⌨️ Control Remapping</h2>
+      <p style="font-size: 14px; color: #aaa; margin-bottom: 20px;">Click a button and press the key you want to use</p>
+      
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+        <div>
+          <label style="color: #00ff88; font-weight: bold; margin-bottom: 5px; display: block;">Move Up</label>
+          <button id="remapMoveUp" style="width: 100%; padding: 10px; font-size: 16px;">W</button>
+        </div>
+        <div>
+          <label style="color: #00ff88; font-weight: bold; margin-bottom: 5px; display: block;">Move Down</label>
+          <button id="remapMoveDown" style="width: 100%; padding: 10px; font-size: 16px;">S</button>
+        </div>
+        <div>
+          <label style="color: #00ff88; font-weight: bold; margin-bottom: 5px; display: block;">Move Left</label>
+          <button id="remapMoveLeft" style="width: 100%; padding: 10px; font-size: 16px;">A</button>
+        </div>
+        <div>
+          <label style="color: #00ff88; font-weight: bold; margin-bottom: 5px; display: block;">Move Right</label>
+          <button id="remapMoveRight" style="width: 100%; padding: 10px; font-size: 16px;">D</button>
+        </div>
+        <div>
+          <label style="color: #ffaa00; font-weight: bold; margin-bottom: 5px; display: block;">Switch Weapon</label>
+          <button id="remapSwitchWeapon" style="width: 100%; padding: 10px; font-size: 16px;">Q</button>
+        </div>
+        <div>
+          <label style="color: #ffaa00; font-weight: bold; margin-bottom: 5px; display: block;">Open Shop</label>
+          <button id="remapShop" style="width: 100%; padding: 10px; font-size: 16px;">F</button>
+        </div>
+        <div>
+          <label style="color: #ff6600; font-weight: bold; margin-bottom: 5px; display: block;">Sprint</label>
+          <button id="remapSprint" style="width: 100%; padding: 10px; font-size: 16px;">Shift</button>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button id="resetControlsBtn" style="flex: 1; padding: 10px; font-size: 14px; background: #ff4444;">Reset to Defaults</button>
+        <button id="controlsCloseBtn" style="flex: 1; padding: 10px; font-size: 14px;">✖️ Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="promoScreen" class="overlay" style="display: none;">
+    <div class="dialog" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+      <h2>🎫 Redeem Promo Code</h2>
+      <p style="color: #aaa;">Enter your promo code to claim rewards. Codes are reusable.</p>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <input id="promoInput" type="text" placeholder="Enter code" style="flex:1;padding:10px;font-size:16px;" />
+        <button id="promoRedeemBtn" style="padding:10px 16px;">Redeem</button>
+      </div>
+      <div id="promoMessage" style="margin-top:12px;color:#ffdd00;font-weight:bold;"></div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button id="promoCloseBtn" style="flex:1;padding:10px;">✖️ Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
   
   <div id="loginScreen" class="overlay" style="display: flex;">
@@ -768,7 +863,7 @@
 
   <!-- Supabase Client Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
+  <script src="promo_codes.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
