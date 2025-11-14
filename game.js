@@ -668,12 +668,25 @@
     getDefaults() {
       return {
         redGems: 0,
+        rainbowCrystals: 0,
         baseDamage: 0,
         fireRateBonus: 0,
         maxHpBonus: 0,
         armorBonus: 0,
         speedBonus: 0,
-        unlockedWeapons: [0]
+        unlockedWeapons: [0],
+        unlockedRainbowWeapons: [],
+        playerColor: "#00d9ff",
+        unlockedColors: ["#00d9ff", "#00ff88", "#ff0000"],
+        controls: {
+          moveUp: 'w',
+          moveDown: 's',
+          moveLeft: 'a',
+          moveRight: 'd',
+          switchWeapon: 'q',
+          shop: 'f',
+          sprint: 'shift'
+        }
       };
     },
     save(data) {
@@ -706,14 +719,41 @@
         { name: "Flamethrower", dmg: 6, bullets: 6, spread: 20, fireRate: 0.12 },
         { name: "Plasma", dmg: 40, bullets: 1, spread: 2, fireRate: 0.6 },
         { name: "LaserSweep", dmg: 25, bullets: 1, spread: 0.5, fireRate: 1.5 },
-        { name: "Rocket", dmg: 120, bullets: 1, spread: 3, fireRate: 1.8 }
+        { name: "Rocket", dmg: 120, bullets: 1, spread: 3, fireRate: 1.8 },
+        // Rainbow Weapons (indices 10-39)
+        { name: "💎 TimeBlaster", dmg: 200, bullets: 1, spread: 0, fireRate: 0.8 },
+        { name: "💎 VortexCannon", dmg: 300, bullets: 3, spread: 15, fireRate: 1.2 },
+        { name: "💎 NeutronBomb", dmg: 500, bullets: 1, spread: 5, fireRate: 2.5 },
+        { name: "💎 PhasingLaser", dmg: 250, bullets: 1, spread: 1, fireRate: 0.5 },
+        { name: "💎 GravityWell", dmg: 350, bullets: 2, spread: 20, fireRate: 1.5 },
+        { name: "💎 StormStrike", dmg: 180, bullets: 8, spread: 40, fireRate: 0.6 },
+        { name: "💎 InfernoBlast", dmg: 400, bullets: 5, spread: 25, fireRate: 1.8 },
+        { name: "💎 IceShatter", dmg: 220, bullets: 6, spread: 18, fireRate: 1.0 },
+        { name: "💎 SonicBoom", dmg: 280, bullets: 1, spread: 2, fireRate: 0.4 },
+        { name: "💎 DimensionRip", dmg: 420, bullets: 2, spread: 10, fireRate: 2.0 },
+        { name: "💎 QuantumShot", dmg: 350, bullets: 4, spread: 12, fireRate: 0.9 },
+        { name: "💎 CelestialRay", dmg: 500, bullets: 1, spread: 0.5, fireRate: 3.0 },
+        { name: "💎 VoidPulse", dmg: 380, bullets: 3, spread: 8, fireRate: 1.3 },
+        { name: "💎 PhoenixFlare", dmg: 450, bullets: 6, spread: 30, fireRate: 1.6 },
+        { name: "💎 FrostNova", dmg: 320, bullets: 10, spread: 35, fireRate: 0.8 },
+        { name: "💎 ThunderStorm", dmg: 290, bullets: 7, spread: 45, fireRate: 0.7 },
+        { name: "💎 ShadowStrike", dmg: 400, bullets: 2, spread: 5, fireRate: 1.1 },
+        { name: "💎 LightBurst", dmg: 380, bullets: 8, spread: 20, fireRate: 1.2 },
+        { name: "💎 ObsidianBolt", dmg: 520, bullets: 1, spread: 1, fireRate: 2.8 },
+        { name: "💎 PrismShatter", dmg: 360, bullets: 12, spread: 50, fireRate: 0.9 },
+        { name: "💎 CosmicFury", dmg: 600, bullets: 1, spread: 3, fireRate: 4.0 },
+        { name: "💎 AbyssalWave", dmg: 480, bullets: 5, spread: 15, fireRate: 1.7 },
+        { name: "💎 EchoingBlade", dmg: 410, bullets: 3, spread: 25, fireRate: 1.4 },
+        { name: "💎 InfinityGun", dmg: 999, bullets: 1, spread: 0, fireRate: 10.0 }
       ];
       this.unlockedWeapons = [0];
       this.shootCooldown = 0;
       this.armor = 0;
       this.speedMul = 1;
       this.pickupRadius = 1;
-      this.color = isP1 ? "#00d9ff" : "#00ff88";
+      this.rainbowCrystals = 0;
+      const perm = PermanentUpgrades.load();
+      this.color = isP1 ? (perm.playerColor || "#00d9ff") : "#00ff88";
       this.isP1 = isP1;
       this.canShoot = true;
       this.magAmmo = 0;
@@ -753,6 +793,19 @@
       
       // Apply unlocked weapons
       this.unlockedWeapons = [...upgrades.unlockedWeapons];
+      // Apply rainbow weapons
+      if (upgrades.unlockedRainbowWeapons && upgrades.unlockedRainbowWeapons.length > 0) {
+        upgrades.unlockedRainbowWeapons.forEach(weaponIndex => {
+          if (!this.unlockedWeapons.includes(weaponIndex)) {
+            this.unlockedWeapons.push(weaponIndex);
+          }
+        });
+      }
+      // Apply saved colors
+      this.secondaryColor = upgrades.selectedSecondary || (upgrades.unlockedColors && upgrades.unlockedColors[1]) || null;
+      // Ensure player's color property matches saved primary
+      const perm = PermanentUpgrades.load();
+      this.color = perm.playerColor || this.color;
     }
 
     update(dt, world) {
@@ -763,10 +816,12 @@
           mx = Input.joystick.x;
           my = Input.joystick.y;
         } else {
-        if (Input.keys['w']) my -= 1;
-        if (Input.keys['s']) my += 1;
-        if (Input.keys['a']) mx -= 1;
-        if (Input.keys['d']) mx += 1;
+          const upgrades = PermanentUpgrades.load();
+          const controls = upgrades.controls || PermanentUpgrades.getDefaults().controls;
+          if (Input.keys[controls.moveUp]) my -= 1;
+          if (Input.keys[controls.moveDown]) my += 1;
+          if (Input.keys[controls.moveLeft]) mx -= 1;
+          if (Input.keys[controls.moveRight]) mx += 1;
         }
       } else {
         if (Input.keys['arrowup']) my -= 1;
@@ -778,7 +833,9 @@
       const len = Math.hypot(mx, my);
       if (len > 0) { mx /= len; my /= len; }
 
-      const speed = this.speed * this.speedMul * (Input.keys['shift'] ? 1.4 : 1);
+      const upgrades2 = PermanentUpgrades.load();
+      const controls2 = upgrades2.controls || PermanentUpgrades.getDefaults().controls;
+      const speed = this.speed * this.speedMul * (Input.keys[controls2.sprint] ? 1.4 : 1);
       const newX = this.x + mx * speed * dt;
       const newY = this.y + my * speed * dt;
 
@@ -877,8 +934,10 @@
       
       // Body with blue gradient
       const bodyGradient = ctx.createRadialGradient(0, 0, this.radius * 0.7, 0, 0, this.radius);
-      bodyGradient.addColorStop(0, '#00a8ff');  // Light blue
-      bodyGradient.addColorStop(1, this.color);  // Original player color
+      const primaryCol = this.color || '#00a8ff';
+      const secondaryCol = this.secondaryColor || primaryCol;
+      bodyGradient.addColorStop(0, primaryCol);
+      bodyGradient.addColorStop(1, secondaryCol);
       
       ctx.fillStyle = bodyGradient;
       ctx.beginPath();
@@ -1609,6 +1668,7 @@ findPathAStar(startX, startY, endX, endY) {
       // Save red gems to permanent upgrades (only once)
       const upgrades = PermanentUpgrades.load();
       upgrades.redGems = (upgrades.redGems || 0) + (this.player.redGems || 0);
+      upgrades.rainbowCrystals = (upgrades.rainbowCrystals || 0) + (this.player.rainbowCrystals || 0);
       PermanentUpgrades.save(upgrades);
       
       if (this.isMultiplayer) {
@@ -1700,8 +1760,9 @@ findPathAStar(startX, startY, endX, endY) {
                 type: "health",
                 value: 50,
                 radius: 7,
-                age: 0,
-                lifetime: 30
+                    age: 0,
+                    lifetime: 30,
+                    pickupDelay: 0.12
               });
             }
           }
@@ -1894,7 +1955,8 @@ findPathAStar(startX, startY, endX, endY) {
                       value: value,
                       radius: lootType === "redGem" ? 9 : 7,
                       age: 0,
-                      lifetime: 30
+                      lifetime: 30,
+                      pickupDelay: 0.12
                     });
                   }
                   this.spawnParticles(e.x, e.y, 30, e.type === "boss" ? "#ff0000" : "#ff8888");
@@ -1974,22 +2036,22 @@ findPathAStar(startX, startY, endX, endY) {
                   let lootType = "coin";
                   let value = 1;
 
-                  // Mostly coins, some green gems, and rare red gems
-                  if (rand < 0.50) { // 50% -> coins (small)
+                  // Coins, green gems, red gems, and rainbow crystals
+                  if (rand < 0.40) { // 40% -> coins (small)
                     lootType = "coin";
                     value = 1 + Math.floor(Math.random() * 3); // 1-3 coins
-                  } else if (rand < 0.80) { // 30% -> green gem
+                  } else if (rand < 0.65) { // 25% -> green gem
                     lootType = "gem";
                     value = 1;
-                  } else if (rand < 0.85) { // 5% -> small red gem
+                  } else if (rand < 0.90) { // 25% -> rainbow crystal
+                    lootType = "rainbowCrystal";
+                    value = 1;
+                  } else if (rand < 0.94) { // 4% -> small red gem
                     lootType = "redGem";
                     value = 1;
-                  } else if (rand < 0.86) { // 1% -> 4 red gems
+                  } else if (rand < 0.95) { // 1% -> 4 red gems
                     lootType = "redGem";
                     value = 4;
-                  } else if (rand < 0.86001) { // 0.001% -> 400 red gems (very rare)
-                    lootType = "redGem";
-                    value = 400;
                   } else { // fallback to coin
                     lootType = "coin";
                     value = 1;
@@ -2000,9 +2062,10 @@ findPathAStar(startX, startY, endX, endY) {
                     y: e.y + randRange(-12, 12),
                     type: lootType,
                     value: value,
-                    radius: lootType === "redGem" ? 9 : 7,
+                    radius: lootType === "rainbowCrystal" ? 10 : (lootType === "redGem" ? 9 : 7),
                     age: 0,
-                    lifetime: 30
+                    lifetime: 30,
+                    pickupDelay: lootType === "rainbowCrystal" ? 0.5 : 0.12
                   });
                 }
                 this.spawnParticles(e.x, e.y, 20, e.type === "boss" ? "#ff0000" : "#ff8888");
@@ -2063,13 +2126,16 @@ findPathAStar(startX, startY, endX, endY) {
         const l = this.loots[i];
         const pickupRadius = l.radius + this.player.radius + (12 * (this.player.pickupRadius || 1));
         const pickupDistSq = pickupRadius * pickupRadius;
-        if (dist2(l.x, l.y, this.player.x, this.player.y) < pickupDistSq) {
+        // Respect pickup delay to allow players to see loot spawned (especially large rainbow crystals)
+        if ((l.age >= (l.pickupDelay || 0)) && dist2(l.x, l.y, this.player.x, this.player.y) < pickupDistSq) {
           if (l.type === "coin") {
             this.player.coins += l.value;
           } else if (l.type === "gem") {
             this.player.gems += l.value;
           } else if (l.type === "redGem") {
             this.player.redGems = (this.player.redGems || 0) + l.value;
+          } else if (l.type === "rainbowCrystal") {
+            this.player.rainbowCrystals = (this.player.rainbowCrystals || 0) + l.value;
           } else if (l.type === "health") {
             this.player.hp = Math.min(this.player.maxHp, this.player.hp + l.value);
           }
@@ -2115,6 +2181,9 @@ findPathAStar(startX, startY, endX, endY) {
         }
         if (document.getElementById('redGemCount')) {
           document.getElementById('redGemCount').textContent = Math.floor(this.player.redGems);
+        }
+        if (document.getElementById('rainbowCrystalCount')) {
+          document.getElementById('rainbowCrystalCount').textContent = Math.floor(this.player.rainbowCrystals);
         }
         
         const armorDisplay = document.getElementById('armorDisplay');
@@ -2259,8 +2328,26 @@ findPathAStar(startX, startY, endX, endY) {
       
       for (const l of this.loots) {
         const bounce = Math.abs(Math.sin(l.age * 5)) * 3;
-        ctx.fillStyle = l.type === "coin" ? "#ffdd00" : l.type === "gem" ? "#00ff88" : l.type === "redGem" ? "#ff4444" : "#ff0000";
-        ctx.strokeStyle = l.type === "coin" ? "#ffaa00" : l.type === "gem" ? "#00cc66" : l.type === "redGem" ? "#cc0000" : "#aa0000";
+        // distinct colors for different loot types (including rainbow crystals)
+        if (l.type === "coin") {
+          ctx.fillStyle = "#ffdd00";
+          ctx.strokeStyle = "#ffaa00";
+        } else if (l.type === "gem") {
+          ctx.fillStyle = "#00ff88";
+          ctx.strokeStyle = "#00cc66";
+        } else if (l.type === "redGem") {
+          ctx.fillStyle = "#ff4444";
+          ctx.strokeStyle = "#cc0000";
+        } else if (l.type === "rainbowCrystal") {
+          ctx.fillStyle = "#ff66ff";
+          ctx.strokeStyle = "#aa00ff";
+        } else if (l.type === "health") {
+          ctx.fillStyle = "#88ccff";
+          ctx.strokeStyle = "#66aaff";
+        } else {
+          ctx.fillStyle = "#ff0000";
+          ctx.strokeStyle = "#aa0000";
+        }
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(l.x, l.y - bounce, l.radius, 0, Math.PI * 2);
@@ -2401,6 +2488,10 @@ findPathAStar(startX, startY, endX, endY) {
         loadingProgress: document.getElementById("loadingProgress"),
         loadingText: document.getElementById("loadingText"),
         leaderboardScreen: this.createLeaderboardScreen()
+        ,
+        customizeScreen: document.getElementById("customizeScreen"),
+        controlsScreen: document.getElementById("controlsScreen"),
+        promoScreen: document.getElementById("promoScreen")
       };
       
       const multiplayerBtn = document.getElementById("multiplayerBtn");
@@ -2413,6 +2504,22 @@ findPathAStar(startX, startY, endX, endY) {
         });
       }
       
+      const customizeBtn = document.getElementById("customizeBtn");
+      if (customizeBtn) {
+        customizeBtn.addEventListener("click", () => {
+          this.elements.homeScreen.style.display = "none";
+          this.elements.customizeScreen.style.display = "flex";
+          this.populateCustomize();
+        });
+      }
+
+      const customizeCloseBtn = document.getElementById("customizeCloseBtn");
+      if (customizeCloseBtn) {
+        customizeCloseBtn.addEventListener("click", () => {
+          this.elements.customizeScreen.style.display = "none";
+          this.elements.homeScreen.style.display = "flex";
+        });
+      }
       const leaderboardBtn = document.getElementById("leaderboardBtn");
       if (leaderboardBtn) {
         leaderboardBtn.addEventListener("click", async () => {
@@ -2439,7 +2546,60 @@ findPathAStar(startX, startY, endX, endY) {
         });
       }
       
-      const logoutBtn = document.getElementById("logoutBtn");
+      const controlsBtn = document.getElementById("controlsBtn");
+      if (controlsBtn) {
+        controlsBtn.addEventListener("click", () => {
+          this.elements.homeScreen.style.display = "none";
+          this.elements.controlsScreen.style.display = "flex";
+          this.populateControls();
+        });
+      }
+      
+      const controlsCloseBtn = document.getElementById("controlsCloseBtn");
+      if (controlsCloseBtn) {
+        controlsCloseBtn.addEventListener("click", () => {
+          this.elements.controlsScreen.style.display = "none";
+          this.elements.homeScreen.style.display = "flex";
+        });
+      }
+      
+      const resetControlsBtn = document.getElementById("resetControlsBtn");
+      if (resetControlsBtn) {
+        resetControlsBtn.addEventListener("click", () => {
+          const defaults = PermanentUpgrades.getDefaults();
+          let upgrades = PermanentUpgrades.load();
+          upgrades.controls = defaults.controls;
+          PermanentUpgrades.save(upgrades);
+          UI.showToast("Controls reset to defaults!");
+          UI.populateControls();
+        });
+      }
+
+        // Promo Codes button handlers
+        const promoBtn = document.getElementById("promoBtn");
+        if (promoBtn) {
+          promoBtn.addEventListener("click", () => {
+            this.elements.homeScreen.style.display = "none";
+            if (this.elements.promoScreen) this.elements.promoScreen.style.display = "flex";
+            this.populatePromoScreen();
+          });
+        }
+        const promoCloseBtn = document.getElementById("promoCloseBtn");
+        if (promoCloseBtn) {
+          promoCloseBtn.addEventListener("click", () => {
+            if (this.elements.promoScreen) this.elements.promoScreen.style.display = "none";
+            this.elements.homeScreen.style.display = "flex";
+          });
+        }
+        const promoRedeemBtn = document.getElementById("promoRedeemBtn");
+        if (promoRedeemBtn) {
+          promoRedeemBtn.addEventListener("click", () => {
+            const val = (document.getElementById('promoInput') || { value: '' }).value || '';
+            this.redeemPromo(val);
+          });
+        }
+
+        const logoutBtn = document.getElementById("logoutBtn");
       if (logoutBtn) {
         this.loginBtn = logoutBtn;
         
@@ -2458,6 +2618,18 @@ findPathAStar(startX, startY, endX, endY) {
         });
       }
       
+      // Load promo codes JSON for redemption (if available)
+      // Initialize from JS fallback immediately to avoid race conditions
+      this.promoCodes = window.PROMO_CODES || [];
+      try {
+        fetch('./promo_codes.json').then(r => {
+          if (!r.ok) throw new Error('no-json');
+          return r.json();
+        }).then(data => { this.promoCodes = data || window.PROMO_CODES || []; }).catch(()=>{ this.promoCodes = window.PROMO_CODES || []; });
+      } catch (e) {
+        this.promoCodes = window.PROMO_CODES || [];
+      }
+
       this.bindEvents();
       this.updateHomeStats();
     },
@@ -2727,22 +2899,26 @@ findPathAStar(startX, startY, endX, endY) {
       document.addEventListener("keydown", e => {
         if (!window.game || !window.game.world) return;
         
-        if (e.key.toLowerCase() === "m") {
+        const upgrades = PermanentUpgrades.load();
+        const controls = upgrades.controls || PermanentUpgrades.getDefaults().controls;
+        const pressedKey = e.key.toLowerCase();
+        
+        if (pressedKey === "m") {
           e.preventDefault();
           if (window.game.devConsole) window.game.devConsole.toggle();
         }
         
-        if (e.key.toLowerCase() === "p") {
+        if (pressedKey === "p") {
           window.game.world.paused = !window.game.world.paused;
           this.elements.pauseScreen.style.display = window.game.world.paused ? "flex" : "none";
         }
         
-        if (e.key.toLowerCase() === "f") {
+        if (pressedKey === controls.shop) {
           e.preventDefault();
           this.openShop();
         }
         
-        if (e.key.toLowerCase() === "q") {
+        if (pressedKey === controls.switchWeapon) {
           const world = window.game.world;
           if (!world.player.unlockedWeapons) world.player.unlockedWeapons = [0];
           let nextIndex = (world.player.weaponIndex + 1) % world.player.weapons.length;
@@ -3014,6 +3190,7 @@ findPathAStar(startX, startY, endX, endY) {
       const upgrades = PermanentUpgrades.load();
       
       document.getElementById("upgradesRedGems").textContent = Math.floor(upgrades.redGems || 0);
+      document.getElementById("upgradesRainbowCrystals").textContent = Math.floor(upgrades.rainbowCrystals || 0);
       
       const upgradeDefs = {
         weapons: [
@@ -3098,6 +3275,248 @@ findPathAStar(startX, startY, endX, endY) {
             }
           }}
         ],
+        rainbowWeapons: [
+          { name: "💎 TimeBlaster", weaponIndex: 10, desc: "200 dmg", cost: 670, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(10)) {
+              upgrades.unlockedRainbowWeapons.push(10);
+              if (!world.player.unlockedWeapons.includes(10)) world.player.unlockedWeapons.push(10);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 TimeBlaster unlocked!");
+            }
+          }},
+          { name: "💎 VortexCannon", weaponIndex: 11, desc: "300 dmg", cost: 680, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(11)) {
+              upgrades.unlockedRainbowWeapons.push(11);
+              if (!world.player.unlockedWeapons.includes(11)) world.player.unlockedWeapons.push(11);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 VortexCannon unlocked!");
+            }
+          }},
+          { name: "💎 NeutronBomb", weaponIndex: 12, desc: "500 dmg", cost: 700, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(12)) {
+              upgrades.unlockedRainbowWeapons.push(12);
+              if (!world.player.unlockedWeapons.includes(12)) world.player.unlockedWeapons.push(12);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 NeutronBomb unlocked!");
+            }
+          }},
+          { name: "💎 FluxCapacitor", weaponIndex: 13, desc: "350 dmg", cost: 690, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(13)) {
+              upgrades.unlockedRainbowWeapons.push(13);
+              if (!world.player.unlockedWeapons.includes(13)) world.player.unlockedWeapons.push(13);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 FluxCapacitor unlocked!");
+            }
+          }},
+          { name: "💎 SuperNova", weaponIndex: 14, desc: "400 dmg", cost: 700, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(14)) {
+              upgrades.unlockedRainbowWeapons.push(14);
+              if (!world.player.unlockedWeapons.includes(14)) world.player.unlockedWeapons.push(14);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 SuperNova unlocked!");
+            }
+          }},
+          { name: "💎 CyberStrike", weaponIndex: 15, desc: "280 dmg", cost: 675, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(15)) {
+              upgrades.unlockedRainbowWeapons.push(15);
+              if (!world.player.unlockedWeapons.includes(15)) world.player.unlockedWeapons.push(15);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 CyberStrike unlocked!");
+            }
+          }},
+          { name: "💎 VoidRipper", weaponIndex: 16, desc: "550 dmg", cost: 750, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(16)) {
+              upgrades.unlockedRainbowWeapons.push(16);
+              if (!world.player.unlockedWeapons.includes(16)) world.player.unlockedWeapons.push(16);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 VoidRipper unlocked!");
+            }
+          }},
+          { name: "💎 NanoBlast", weaponIndex: 17, desc: "320 dmg", cost: 685, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(17)) {
+              upgrades.unlockedRainbowWeapons.push(17);
+              if (!world.player.unlockedWeapons.includes(17)) world.player.unlockedWeapons.push(17);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 NanoBlast unlocked!");
+            }
+          }},
+          { name: "💎 InfernoWave", weaponIndex: 18, desc: "450 dmg", cost: 710, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(18)) {
+              upgrades.unlockedRainbowWeapons.push(18);
+              if (!world.player.unlockedWeapons.includes(18)) world.player.unlockedWeapons.push(18);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 InfernoWave unlocked!");
+            }
+          }},
+          { name: "💎 QuantumShredder", weaponIndex: 19, desc: "600 dmg", cost: 800, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(19)) {
+              upgrades.unlockedRainbowWeapons.push(19);
+              if (!world.player.unlockedWeapons.includes(19)) world.player.unlockedWeapons.push(19);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 QuantumShredder unlocked!");
+            }
+          }},
+          { name: "💎 PlasmaDancer", weaponIndex: 20, desc: "380 dmg", cost: 695, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(20)) {
+              upgrades.unlockedRainbowWeapons.push(20);
+              if (!world.player.unlockedWeapons.includes(20)) world.player.unlockedWeapons.push(20);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 PlasmaDancer unlocked!");
+            }
+          }},
+          { name: "💎 CrimsonEdge", weaponIndex: 21, desc: "420 dmg", cost: 705, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(21)) {
+              upgrades.unlockedRainbowWeapons.push(21);
+              if (!world.player.unlockedWeapons.includes(21)) world.player.unlockedWeapons.push(21);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 CrimsonEdge unlocked!");
+            }
+          }},
+          { name: "💎 SolarFlare", weaponIndex: 22, desc: "500 dmg", cost: 730, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(22)) {
+              upgrades.unlockedRainbowWeapons.push(22);
+              if (!world.player.unlockedWeapons.includes(22)) world.player.unlockedWeapons.push(22);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 SolarFlare unlocked!");
+            }
+          }},
+          { name: "💎 FrostByte", weaponIndex: 23, desc: "290 dmg", cost: 680, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(23)) {
+              upgrades.unlockedRainbowWeapons.push(23);
+              if (!world.player.unlockedWeapons.includes(23)) world.player.unlockedWeapons.push(23);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 FrostByte unlocked!");
+            }
+          }},
+          { name: "💎 ThunderStorm", weaponIndex: 24, desc: "520 dmg", cost: 740, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(24)) {
+              upgrades.unlockedRainbowWeapons.push(24);
+              if (!world.player.unlockedWeapons.includes(24)) world.player.unlockedWeapons.push(24);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 ThunderStorm unlocked!");
+            }
+          }},
+          { name: "💎 EchoPhantom", weaponIndex: 25, desc: "360 dmg", cost: 692, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(25)) {
+              upgrades.unlockedRainbowWeapons.push(25);
+              if (!world.player.unlockedWeapons.includes(25)) world.player.unlockedWeapons.push(25);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 EchoPhantom unlocked!");
+            }
+          }},
+          { name: "💎 SilverBullet", weaponIndex: 26, desc: "480 dmg", cost: 720, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(26)) {
+              upgrades.unlockedRainbowWeapons.push(26);
+              if (!world.player.unlockedWeapons.includes(26)) world.player.unlockedWeapons.push(26);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 SilverBullet unlocked!");
+            }
+          }},
+          { name: "💎 OmegaBeam", weaponIndex: 27, desc: "620 dmg", cost: 820, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(27)) {
+              upgrades.unlockedRainbowWeapons.push(27);
+              if (!world.player.unlockedWeapons.includes(27)) world.player.unlockedWeapons.push(27);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 OmegaBeam unlocked!");
+            }
+          }},
+          { name: "💎 XenoBurst", weaponIndex: 28, desc: "310 dmg", cost: 678, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(28)) {
+              upgrades.unlockedRainbowWeapons.push(28);
+              if (!world.player.unlockedWeapons.includes(28)) world.player.unlockedWeapons.push(28);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 XenoBurst unlocked!");
+            }
+          }},
+          { name: "💎 VenomStrike", weaponIndex: 29, desc: "440 dmg", cost: 715, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(29)) {
+              upgrades.unlockedRainbowWeapons.push(29);
+              if (!world.player.unlockedWeapons.includes(29)) world.player.unlockedWeapons.push(29);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 VenomStrike unlocked!");
+            }
+          }},
+          { name: "💎 GhostPhase", weaponIndex: 30, desc: "340 dmg", cost: 688, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(30)) {
+              upgrades.unlockedRainbowWeapons.push(30);
+              if (!world.player.unlockedWeapons.includes(30)) world.player.unlockedWeapons.push(30);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 GhostPhase unlocked!");
+            }
+          }},
+          { name: "💎 VenusStorm", weaponIndex: 31, desc: "570 dmg", cost: 760, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(31)) {
+              upgrades.unlockedRainbowWeapons.push(31);
+              if (!world.player.unlockedWeapons.includes(31)) world.player.unlockedWeapons.push(31);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 VenusStorm unlocked!");
+            }
+          }},
+          { name: "💎 DeathRay", weaponIndex: 32, desc: "700 dmg", cost: 900, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(32)) {
+              upgrades.unlockedRainbowWeapons.push(32);
+              if (!world.player.unlockedWeapons.includes(32)) world.player.unlockedWeapons.push(32);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 DeathRay unlocked!");
+            }
+          }},
+          { name: "💎 CosmicFury", weaponIndex: 33, desc: "600 dmg", cost: 800, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(33)) {
+              upgrades.unlockedRainbowWeapons.push(33);
+              if (!world.player.unlockedWeapons.includes(33)) world.player.unlockedWeapons.push(33);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 CosmicFury unlocked!");
+            }
+          }},
+          { name: "💎 NeoGenesis", weaponIndex: 34, desc: "500 dmg", cost: 735, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(34)) {
+              upgrades.unlockedRainbowWeapons.push(34);
+              if (!world.player.unlockedWeapons.includes(34)) world.player.unlockedWeapons.push(34);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 NeoGenesis unlocked!");
+            }
+          }},
+          { name: "💎 ZenithPulse", weaponIndex: 35, desc: "430 dmg", cost: 708, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(35)) {
+              upgrades.unlockedRainbowWeapons.push(35);
+              if (!world.player.unlockedWeapons.includes(35)) world.player.unlockedWeapons.push(35);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 ZenithPulse unlocked!");
+            }
+          }},
+          { name: "💎 CelestialWrath", weaponIndex: 36, desc: "650 dmg", cost: 850, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(36)) {
+              upgrades.unlockedRainbowWeapons.push(36);
+              if (!world.player.unlockedWeapons.includes(36)) world.player.unlockedWeapons.push(36);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 CelestialWrath unlocked!");
+            }
+          }},
+          { name: "💎 ObsidianDoom", weaponIndex: 37, desc: "800 dmg", cost: 1000, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(37)) {
+              upgrades.unlockedRainbowWeapons.push(37);
+              if (!world.player.unlockedWeapons.includes(37)) world.player.unlockedWeapons.push(37);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 ObsidianDoom unlocked!");
+            }
+          }},
+          { name: "💎 PhoenixRise", weaponIndex: 38, desc: "560 dmg", cost: 755, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(38)) {
+              upgrades.unlockedRainbowWeapons.push(38);
+              if (!world.player.unlockedWeapons.includes(38)) world.player.unlockedWeapons.push(38);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 PhoenixRise unlocked!");
+            }
+          }},
+          { name: "💎 InfinityGun", weaponIndex: 39, desc: "999 dmg", cost: 1200, apply: () => { 
+            if (!upgrades.unlockedRainbowWeapons.includes(39)) {
+              upgrades.unlockedRainbowWeapons.push(39);
+              if (!world.player.unlockedWeapons.includes(39)) world.player.unlockedWeapons.push(39);
+              PermanentUpgrades.save(upgrades);
+              UI.showToast("💎 InfinityGun ULTIMATE!");
+            }
+          }}
+        ],
         defense: [
           { name: "Max HP +25", desc: "Permanent +25 health", cost: 40, apply: () => { 
             upgrades.maxHpBonus += 25;
@@ -3169,8 +3588,6 @@ findPathAStar(startX, startY, endX, endY) {
           if (isOwned) {
             btn.textContent = "Purchased";
             btn.disabled = true;
-            btn.style.opacity = "0.5";
-            btn.style.cursor = "not-allowed";
           } else {
             btn.textContent = "Buy";
             btn.disabled = !canAfford;
@@ -3193,6 +3610,254 @@ findPathAStar(startX, startY, endX, endY) {
           container.appendChild(div);
         });
       });
+
+      // Render rainbow weapons separately with rainbow crystals currency
+      const rainbowContainer = document.getElementById("rainbowWeaponsUpgrades");
+      if (rainbowContainer) {
+        rainbowContainer.innerHTML = "";
+        upgradeDefs.rainbowWeapons.forEach(u => {
+          const div = document.createElement("div");
+          div.className = "shop-item";
+          const canAfford = (upgrades.rainbowCrystals || 0) >= u.cost;
+          const isOwned = (u.weaponIndex !== undefined) && (upgrades.unlockedRainbowWeapons || []).includes(u.weaponIndex);
+
+          div.innerHTML = `<h4>${u.name}</h4><p>${u.desc}</p><p style='color: #ff00ff;'>${u.cost} 🌈</p>`;
+
+          const btn = document.createElement("button");
+          if (isOwned) {
+            btn.textContent = "Purchased";
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+          } else {
+            btn.textContent = "Buy";
+            btn.disabled = !canAfford;
+            if (!canAfford) { btn.style.opacity = "0.5"; btn.style.cursor = "not-allowed"; }
+
+            btn.onclick = () => {
+              if ((upgrades.rainbowCrystals || 0) >= u.cost) {
+                upgrades.rainbowCrystals = (upgrades.rainbowCrystals || 0) - u.cost;
+                PermanentUpgrades.save(upgrades);
+                document.getElementById("upgradesRainbowCrystals").textContent = Math.floor(upgrades.rainbowCrystals || 0);
+                u.apply();
+                UI.showToast("Bought " + u.name + "! Permanent upgrade!");
+                UI.populateUpgrades();
+              } else {
+                UI.showToast("Not enough Rainbow Crystals!");
+              }
+            };
+          }
+          div.appendChild(btn);
+          rainbowContainer.appendChild(div);
+        });
+      }
+    },
+
+    populateCustomize() {
+      const upgrades = PermanentUpgrades.load();
+      const primaryContainer = document.getElementById('primaryColors');
+      const secondaryContainer = document.getElementById('secondaryColors');
+      const preview = document.getElementById('colorPreview');
+      const redCount = document.getElementById('customizeRedGems');
+      if (redCount) redCount.textContent = Math.floor(upgrades.redGems || 0);
+
+      const primaryColors = ['#00d9ff', '#00ff88', '#ffdd00', '#ff3366', '#ffffff', '#00aaff'];
+      const secondaryColors = ['#ff66cc', '#8800ff', '#ff8800', '#00ffaa', '#ff4444', '#663300'];
+
+      if (primaryContainer) {
+        primaryContainer.innerHTML = '';
+        primaryColors.forEach(c => {
+          const btn = document.createElement('button');
+          btn.style.background = c;
+          btn.style.height = '36px';
+          btn.style.borderRadius = '6px';
+          btn.onclick = () => {
+            const upgrades = PermanentUpgrades.load();
+            upgrades.playerColor = c;
+            PermanentUpgrades.save(upgrades);
+            // apply live if in-game
+            if (window.game && window.game.world && window.game.world.player) {
+              window.game.world.player.color = c;
+            }
+            this.updatePlayerColorPreview(preview, upgrades.playerColor, (upgrades.selectedSecondary || (upgrades.unlockedColors && upgrades.unlockedColors[1])));
+            UI.showToast('Primary color set');
+          };
+          primaryContainer.appendChild(btn);
+        });
+      }
+
+      if (secondaryContainer) {
+        secondaryContainer.innerHTML = '';
+        secondaryColors.forEach(c => {
+          const div = document.createElement('div');
+          div.style.display = 'flex';
+          div.style.flexDirection = 'column';
+          div.style.gap = '6px';
+
+          const btn = document.createElement('button');
+          btn.style.background = c;
+          btn.style.height = '36px';
+          btn.style.borderRadius = '6px';
+
+          const price = document.createElement('small');
+          price.style.color = '#ff4444';
+          price.textContent = '50 🔴';
+
+          btn.onclick = () => {
+            const upgrades = PermanentUpgrades.load();
+            if ((upgrades.unlockedColors || []).includes(c)) {
+              upgrades.selectedSecondary = c;
+              PermanentUpgrades.save(upgrades);
+              if (window.game && window.game.world && window.game.world.player) {
+                window.game.world.player.secondaryColor = c;
+              }
+              this.updatePlayerColorPreview(preview, upgrades.playerColor, upgrades.selectedSecondary);
+              UI.showToast('Secondary color applied');
+              return;
+            }
+            if ((upgrades.redGems || 0) >= 50) {
+              upgrades.redGems = (upgrades.redGems || 0) - 50;
+              upgrades.unlockedColors = upgrades.unlockedColors || [];
+              upgrades.unlockedColors.push(c);
+              upgrades.selectedSecondary = c;
+              PermanentUpgrades.save(upgrades);
+              if (redCount) redCount.textContent = Math.floor(upgrades.redGems || 0);
+              if (window.game && window.game.world && window.game.world.player) {
+                window.game.world.player.secondaryColor = c;
+              }
+              this.updatePlayerColorPreview(preview, upgrades.playerColor, upgrades.selectedSecondary);
+              UI.showToast('Secondary color purchased and applied');
+            } else {
+              UI.showToast('Not enough Red Gems');
+            }
+          };
+
+          div.appendChild(btn);
+          div.appendChild(price);
+          secondaryContainer.appendChild(div);
+        });
+      }
+
+      // initial preview
+      const upgradesNow = PermanentUpgrades.load();
+      this.updatePlayerColorPreview(preview, upgradesNow.playerColor, upgradesNow.selectedSecondary || (upgradesNow.unlockedColors && upgradesNow.unlockedColors[1]));
+    },
+
+    populateControls() {
+      const upgrades = PermanentUpgrades.load();
+      const controls = upgrades.controls || PermanentUpgrades.getDefaults().controls;
+      
+      const keyMap = {
+        moveUp: 'remapMoveUp',
+        moveDown: 'remapMoveDown',
+        moveLeft: 'remapMoveLeft',
+        moveRight: 'remapMoveRight',
+        switchWeapon: 'remapSwitchWeapon',
+        shop: 'remapShop',
+        sprint: 'remapSprint'
+      };
+      
+      Object.entries(keyMap).forEach(([controlName, buttonId]) => {
+        const btn = document.getElementById(buttonId);
+        if (btn) {
+          const keyValue = controls[controlName] || '';
+          btn.textContent = keyValue.toUpperCase() === 'SHIFT' ? 'Shift' : keyValue.toUpperCase();
+          
+          btn.onclick = () => {
+            btn.textContent = "Press any key...";
+            btn.style.opacity = "0.5";
+            btn.disabled = true;
+            
+            const handleKeyDown = (e) => {
+              e.preventDefault();
+              let keyName = e.key.toLowerCase();
+              if (e.key === ' ') keyName = 'space';
+              if (e.shiftKey && e.key !== 'Shift') keyName = 'shift';
+              
+              controls[controlName] = keyName;
+              upgrades.controls = controls;
+              PermanentUpgrades.save(upgrades);
+              
+              btn.textContent = keyName.toUpperCase() === 'SHIFT' ? 'Shift' : keyName.toUpperCase();
+              btn.style.opacity = "1";
+              btn.disabled = false;
+              document.removeEventListener('keydown', handleKeyDown);
+              UI.showToast(`${controlName.replace(/([A-Z])/g, ' $1')} set to ${keyName.toUpperCase()}`);
+            };
+            
+            document.addEventListener('keydown', handleKeyDown, { once: true });
+          };
+        }
+      });
+    },
+
+    populatePromoScreen() {
+      const input = document.getElementById('promoInput');
+      const msg = document.getElementById('promoMessage');
+      if (input) input.value = '';
+      if (msg) msg.textContent = '';
+    },
+
+    redeemPromo(code) {
+      const c = (code || '').toString().trim();
+      const msg = document.getElementById('promoMessage');
+      if (!c) {
+        if (msg) msg.textContent = 'Please enter a promo code.';
+        UI.showToast('Enter a promo code');
+        return;
+      }
+
+      const codes = this.promoCodes || [];
+      const found = codes.find(p => p.code.toUpperCase() === c.toUpperCase());
+      if (!found) {
+        if (msg) msg.textContent = 'Invalid promo code.';
+        UI.showToast('Invalid promo code');
+        return;
+      }
+
+      const upgrades = PermanentUpgrades.load();
+
+      // Apply rewards (codes are reusable — not one-time)
+      const r = found.rainbow || 0;
+      const rg = found.redGems || 0;
+      upgrades.rainbowCrystals = (upgrades.rainbowCrystals || 0) + r;
+      upgrades.redGems = (upgrades.redGems || 0) + rg;
+      PermanentUpgrades.save(upgrades);
+
+      // Apply to active player if present
+      try {
+        if (window.game && window.game.world && window.game.world.player) {
+          window.game.world.player.rainbowCrystals = (window.game.world.player.rainbowCrystals || 0) + r;
+          window.game.world.player.redGems = (window.game.world.player.redGems || 0) + rg;
+        }
+      } catch (e) {}
+
+      // Update HUD and upgrades display
+      const rcEl = document.getElementById('rainbowCrystalCount');
+      const redEl = document.getElementById('redGemCount');
+      const upRC = document.getElementById('upgradesRainbowCrystals');
+      const upRed = document.getElementById('upgradesRedGems');
+      if (rcEl) rcEl.textContent = Math.floor(upgrades.rainbowCrystals || 0);
+      if (redEl) redEl.textContent = Math.floor(upgrades.redGems || 0);
+      if (upRC) upRC.textContent = Math.floor(upgrades.rainbowCrystals || 0);
+      if (upRed) upRed.textContent = Math.floor(upgrades.redGems || 0);
+
+      if (msg) msg.textContent = `Redeemed ${found.code}: +${r} 🌈, +${rg} 🔴`;
+      UI.showToast('Promo redeemed! Rewards applied');
+    },
+
+    updatePlayerColorPreview(canvasEl, primary, secondary) {
+      if (!canvasEl) return;
+      try {
+        const ctx = canvasEl.getContext('2d');
+        ctx.clearRect(0,0,canvasEl.width,canvasEl.height);
+        // draw primary circle
+        ctx.fillStyle = primary || '#00d9ff';
+        ctx.beginPath(); ctx.arc(50,50,34,0,Math.PI*2); ctx.fill();
+        // draw secondary inner crescent
+        ctx.fillStyle = secondary || 'rgba(255,255,255,0.3)';
+        ctx.beginPath(); ctx.arc(62,44,18,0,Math.PI*2); ctx.fill();
+      } catch (e) {}
     },
     
     showToast(msg) {
