@@ -662,8 +662,15 @@
     load() {
       try {
         const data = localStorage.getItem(this.key);
-        return data ? JSON.parse(data) : this.getDefaults();
-      } catch (e) { return this.getDefaults(); }
+        if (data) {
+          // By merging with defaults, we ensure that new properties are added to old save files.
+          return { ...this.getDefaults(), ...JSON.parse(data) };
+        }
+        return this.getDefaults();
+      } catch (e) {
+        // If parsing fails, return fresh defaults.
+        return this.getDefaults();
+      }
     },
     getDefaults() {
       return {
@@ -3276,244 +3283,280 @@ findPathAStar(startX, startY, endX, endY) {
           }}
         ],
         rainbowWeapons: [
-          { name: "💎 TimeBlaster", weaponIndex: 10, desc: "200 dmg", cost: 670, apply: () => { 
-            if (!upgrades.unlockedRainbowWeapons.includes(10)) {
-              upgrades.unlockedRainbowWeapons.push(10);
-              if (!world.player.unlockedWeapons.includes(10)) world.player.unlockedWeapons.push(10);
-              PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 TimeBlaster unlocked!");
+          { name: "💎 TimeBlaster", weaponIndex: 10, desc: "200 dmg", cost: 670, apply: () => {
+            try {
+              if (!upgrades.unlockedRainbowWeapons.includes(10)) {
+                console.log("Unlocking TimeBlaster. World:", world, "Upgrades:", upgrades);
+                upgrades.unlockedRainbowWeapons.push(10);
+                if (!world.player.unlockedWeapons.includes(10)) world.player.unlockedWeapons.push(10);
+                world.player.weaponIndex = 10;
+                PermanentUpgrades.save(upgrades);
+                UI.showToast("💎 TimeBlaster unlocked and equipped!");
+              }
+            } catch (e) {
+              console.error("Error purchasing TimeBlaster:", e);
+              alert("A critical error occurred while purchasing: " + e.message);
             }
           }},
           { name: "💎 VortexCannon", weaponIndex: 11, desc: "300 dmg", cost: 680, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(11)) {
               upgrades.unlockedRainbowWeapons.push(11);
               if (!world.player.unlockedWeapons.includes(11)) world.player.unlockedWeapons.push(11);
+              world.player.weaponIndex = 11;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 VortexCannon unlocked!");
+              UI.showToast("💎 VortexCannon unlocked and equipped!");
             }
           }},
           { name: "💎 NeutronBomb", weaponIndex: 12, desc: "500 dmg", cost: 700, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(12)) {
               upgrades.unlockedRainbowWeapons.push(12);
               if (!world.player.unlockedWeapons.includes(12)) world.player.unlockedWeapons.push(12);
+              world.player.weaponIndex = 12;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 NeutronBomb unlocked!");
+              UI.showToast("💎 NeutronBomb unlocked and equipped!");
             }
           }},
           { name: "💎 FluxCapacitor", weaponIndex: 13, desc: "350 dmg", cost: 690, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(13)) {
               upgrades.unlockedRainbowWeapons.push(13);
               if (!world.player.unlockedWeapons.includes(13)) world.player.unlockedWeapons.push(13);
+              world.player.weaponIndex = 13;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 FluxCapacitor unlocked!");
+              UI.showToast("💎 FluxCapacitor unlocked and equipped!");
             }
           }},
           { name: "💎 SuperNova", weaponIndex: 14, desc: "400 dmg", cost: 700, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(14)) {
               upgrades.unlockedRainbowWeapons.push(14);
               if (!world.player.unlockedWeapons.includes(14)) world.player.unlockedWeapons.push(14);
+              world.player.weaponIndex = 14;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 SuperNova unlocked!");
+              UI.showToast("💎 SuperNova unlocked and equipped!");
             }
           }},
           { name: "💎 CyberStrike", weaponIndex: 15, desc: "280 dmg", cost: 675, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(15)) {
               upgrades.unlockedRainbowWeapons.push(15);
               if (!world.player.unlockedWeapons.includes(15)) world.player.unlockedWeapons.push(15);
+              world.player.weaponIndex = 15;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 CyberStrike unlocked!");
+              UI.showToast("💎 CyberStrike unlocked and equipped!");
             }
           }},
           { name: "💎 VoidRipper", weaponIndex: 16, desc: "550 dmg", cost: 750, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(16)) {
               upgrades.unlockedRainbowWeapons.push(16);
               if (!world.player.unlockedWeapons.includes(16)) world.player.unlockedWeapons.push(16);
+              world.player.weaponIndex = 16;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 VoidRipper unlocked!");
+              UI.showToast("💎 VoidRipper unlocked and equipped!");
             }
           }},
           { name: "💎 NanoBlast", weaponIndex: 17, desc: "320 dmg", cost: 685, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(17)) {
               upgrades.unlockedRainbowWeapons.push(17);
               if (!world.player.unlockedWeapons.includes(17)) world.player.unlockedWeapons.push(17);
+              world.player.weaponIndex = 17;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 NanoBlast unlocked!");
+              UI.showToast("💎 NanoBlast unlocked and equipped!");
             }
           }},
           { name: "💎 InfernoWave", weaponIndex: 18, desc: "450 dmg", cost: 710, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(18)) {
               upgrades.unlockedRainbowWeapons.push(18);
               if (!world.player.unlockedWeapons.includes(18)) world.player.unlockedWeapons.push(18);
+              world.player.weaponIndex = 18;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 InfernoWave unlocked!");
+              UI.showToast("💎 InfernoWave unlocked and equipped!");
             }
           }},
           { name: "💎 QuantumShredder", weaponIndex: 19, desc: "600 dmg", cost: 800, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(19)) {
               upgrades.unlockedRainbowWeapons.push(19);
               if (!world.player.unlockedWeapons.includes(19)) world.player.unlockedWeapons.push(19);
+              world.player.weaponIndex = 19;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 QuantumShredder unlocked!");
+              UI.showToast("💎 QuantumShredder unlocked and equipped!");
             }
           }},
           { name: "💎 PlasmaDancer", weaponIndex: 20, desc: "380 dmg", cost: 695, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(20)) {
               upgrades.unlockedRainbowWeapons.push(20);
               if (!world.player.unlockedWeapons.includes(20)) world.player.unlockedWeapons.push(20);
+              world.player.weaponIndex = 20;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 PlasmaDancer unlocked!");
+              UI.showToast("💎 PlasmaDancer unlocked and equipped!");
             }
           }},
           { name: "💎 CrimsonEdge", weaponIndex: 21, desc: "420 dmg", cost: 705, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(21)) {
               upgrades.unlockedRainbowWeapons.push(21);
               if (!world.player.unlockedWeapons.includes(21)) world.player.unlockedWeapons.push(21);
+              world.player.weaponIndex = 21;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 CrimsonEdge unlocked!");
+              UI.showToast("💎 CrimsonEdge unlocked and equipped!");
             }
           }},
           { name: "💎 SolarFlare", weaponIndex: 22, desc: "500 dmg", cost: 730, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(22)) {
               upgrades.unlockedRainbowWeapons.push(22);
               if (!world.player.unlockedWeapons.includes(22)) world.player.unlockedWeapons.push(22);
+              world.player.weaponIndex = 22;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 SolarFlare unlocked!");
+              UI.showToast("💎 SolarFlare unlocked and equipped!");
             }
           }},
           { name: "💎 FrostByte", weaponIndex: 23, desc: "290 dmg", cost: 680, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(23)) {
               upgrades.unlockedRainbowWeapons.push(23);
               if (!world.player.unlockedWeapons.includes(23)) world.player.unlockedWeapons.push(23);
+              world.player.weaponIndex = 23;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 FrostByte unlocked!");
+              UI.showToast("💎 FrostByte unlocked and equipped!");
             }
           }},
           { name: "💎 ThunderStorm", weaponIndex: 24, desc: "520 dmg", cost: 740, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(24)) {
               upgrades.unlockedRainbowWeapons.push(24);
               if (!world.player.unlockedWeapons.includes(24)) world.player.unlockedWeapons.push(24);
+              world.player.weaponIndex = 24;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 ThunderStorm unlocked!");
+              UI.showToast("💎 ThunderStorm unlocked and equipped!");
             }
           }},
           { name: "💎 EchoPhantom", weaponIndex: 25, desc: "360 dmg", cost: 692, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(25)) {
               upgrades.unlockedRainbowWeapons.push(25);
               if (!world.player.unlockedWeapons.includes(25)) world.player.unlockedWeapons.push(25);
+              world.player.weaponIndex = 25;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 EchoPhantom unlocked!");
+              UI.showToast("💎 EchoPhantom unlocked and equipped!");
             }
           }},
           { name: "💎 SilverBullet", weaponIndex: 26, desc: "480 dmg", cost: 720, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(26)) {
               upgrades.unlockedRainbowWeapons.push(26);
               if (!world.player.unlockedWeapons.includes(26)) world.player.unlockedWeapons.push(26);
+              world.player.weaponIndex = 26;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 SilverBullet unlocked!");
+              UI.showToast("💎 SilverBullet unlocked and equipped!");
             }
           }},
           { name: "💎 OmegaBeam", weaponIndex: 27, desc: "620 dmg", cost: 820, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(27)) {
               upgrades.unlockedRainbowWeapons.push(27);
               if (!world.player.unlockedWeapons.includes(27)) world.player.unlockedWeapons.push(27);
+              world.player.weaponIndex = 27;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 OmegaBeam unlocked!");
+              UI.showToast("💎 OmegaBeam unlocked and equipped!");
             }
           }},
           { name: "💎 XenoBurst", weaponIndex: 28, desc: "310 dmg", cost: 678, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(28)) {
               upgrades.unlockedRainbowWeapons.push(28);
               if (!world.player.unlockedWeapons.includes(28)) world.player.unlockedWeapons.push(28);
+              world.player.weaponIndex = 28;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 XenoBurst unlocked!");
+              UI.showToast("💎 XenoBurst unlocked and equipped!");
             }
           }},
           { name: "💎 VenomStrike", weaponIndex: 29, desc: "440 dmg", cost: 715, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(29)) {
               upgrades.unlockedRainbowWeapons.push(29);
               if (!world.player.unlockedWeapons.includes(29)) world.player.unlockedWeapons.push(29);
+              world.player.weaponIndex = 29;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 VenomStrike unlocked!");
+              UI.showToast("💎 VenomStrike unlocked and equipped!");
             }
           }},
           { name: "💎 GhostPhase", weaponIndex: 30, desc: "340 dmg", cost: 688, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(30)) {
               upgrades.unlockedRainbowWeapons.push(30);
               if (!world.player.unlockedWeapons.includes(30)) world.player.unlockedWeapons.push(30);
+              world.player.weaponIndex = 30;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 GhostPhase unlocked!");
+              UI.showToast("💎 GhostPhase unlocked and equipped!");
             }
           }},
           { name: "💎 VenusStorm", weaponIndex: 31, desc: "570 dmg", cost: 760, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(31)) {
               upgrades.unlockedRainbowWeapons.push(31);
               if (!world.player.unlockedWeapons.includes(31)) world.player.unlockedWeapons.push(31);
+              world.player.weaponIndex = 31;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 VenusStorm unlocked!");
+              UI.showToast("💎 VenusStorm unlocked and equipped!");
             }
           }},
           { name: "💎 DeathRay", weaponIndex: 32, desc: "700 dmg", cost: 900, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(32)) {
               upgrades.unlockedRainbowWeapons.push(32);
               if (!world.player.unlockedWeapons.includes(32)) world.player.unlockedWeapons.push(32);
+              world.player.weaponIndex = 32;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 DeathRay unlocked!");
+              UI.showToast("💎 DeathRay unlocked and equipped!");
             }
           }},
           { name: "💎 CosmicFury", weaponIndex: 33, desc: "600 dmg", cost: 800, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(33)) {
               upgrades.unlockedRainbowWeapons.push(33);
               if (!world.player.unlockedWeapons.includes(33)) world.player.unlockedWeapons.push(33);
+              world.player.weaponIndex = 33;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 CosmicFury unlocked!");
+              UI.showToast("💎 CosmicFury unlocked and equipped!");
             }
           }},
           { name: "💎 NeoGenesis", weaponIndex: 34, desc: "500 dmg", cost: 735, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(34)) {
               upgrades.unlockedRainbowWeapons.push(34);
               if (!world.player.unlockedWeapons.includes(34)) world.player.unlockedWeapons.push(34);
+              world.player.weaponIndex = 34;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 NeoGenesis unlocked!");
+              UI.showToast("💎 NeoGenesis unlocked and equipped!");
             }
           }},
           { name: "💎 ZenithPulse", weaponIndex: 35, desc: "430 dmg", cost: 708, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(35)) {
               upgrades.unlockedRainbowWeapons.push(35);
               if (!world.player.unlockedWeapons.includes(35)) world.player.unlockedWeapons.push(35);
+              world.player.weaponIndex = 35;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 ZenithPulse unlocked!");
+              UI.showToast("💎 ZenithPulse unlocked and equipped!");
             }
           }},
           { name: "💎 CelestialWrath", weaponIndex: 36, desc: "650 dmg", cost: 850, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(36)) {
               upgrades.unlockedRainbowWeapons.push(36);
               if (!world.player.unlockedWeapons.includes(36)) world.player.unlockedWeapons.push(36);
+              world.player.weaponIndex = 36;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 CelestialWrath unlocked!");
+              UI.showToast("💎 CelestialWrath unlocked and equipped!");
             }
           }},
           { name: "💎 ObsidianDoom", weaponIndex: 37, desc: "800 dmg", cost: 1000, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(37)) {
               upgrades.unlockedRainbowWeapons.push(37);
               if (!world.player.unlockedWeapons.includes(37)) world.player.unlockedWeapons.push(37);
+              world.player.weaponIndex = 37;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 ObsidianDoom unlocked!");
+              UI.showToast("💎 ObsidianDoom unlocked and equipped!");
             }
           }},
           { name: "💎 PhoenixRise", weaponIndex: 38, desc: "560 dmg", cost: 755, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(38)) {
               upgrades.unlockedRainbowWeapons.push(38);
               if (!world.player.unlockedWeapons.includes(38)) world.player.unlockedWeapons.push(38);
+              world.player.weaponIndex = 38;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 PhoenixRise unlocked!");
+              UI.showToast("💎 PhoenixRise unlocked and equipped!");
             }
           }},
           { name: "💎 InfinityGun", weaponIndex: 39, desc: "999 dmg", cost: 1200, apply: () => { 
             if (!upgrades.unlockedRainbowWeapons.includes(39)) {
               upgrades.unlockedRainbowWeapons.push(39);
               if (!world.player.unlockedWeapons.includes(39)) world.player.unlockedWeapons.push(39);
+              world.player.weaponIndex = 39;
               PermanentUpgrades.save(upgrades);
-              UI.showToast("💎 InfinityGun ULTIMATE!");
+              UI.showToast("💎 InfinityGun ULTIMATE and equipped!");
             }
           }}
         ],
