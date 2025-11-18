@@ -3858,14 +3858,25 @@ findPathAStar(startX, startY, endX, endY) {
         return;
       }
 
+      const redeemedCodes = JSON.parse(localStorage.getItem('redeemedCodes')) || [];
+      if (redeemedCodes.includes(c.toUpperCase())) {
+        if (msg) msg.textContent = 'You have already redeemed this code.';
+        UI.showToast('Promo code already redeemed');
+        return;
+      }
+
       const upgrades = PermanentUpgrades.load();
 
-      // Apply rewards (codes are reusable — not one-time)
+      // Apply rewards
       const r = found.rainbow || 0;
       const rg = found.redGems || 0;
       upgrades.rainbowCrystals = (upgrades.rainbowCrystals || 0) + r;
       upgrades.redGems = (upgrades.redGems || 0) + rg;
       PermanentUpgrades.save(upgrades);
+
+      // Add the code to the redeemed list
+      redeemedCodes.push(c.toUpperCase());
+      localStorage.setItem('redeemedCodes', JSON.stringify(redeemedCodes));
 
       // Apply to active player if present
       try {
