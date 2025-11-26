@@ -2663,11 +2663,14 @@ findPathAStar(startX, startY, endX, endY) {
       const multiplayerBtn = document.getElementById("multiplayerBtn");
       if (multiplayerBtn) {
         multiplayerBtn.addEventListener("click", () => {
+          console.log("[Multiplayer] Button clicked");
           this.elements.homeScreen.style.display = "none";
-          this.elements.multiplayerScreen = document.getElementById("multiplayerScreen");
           if (this.elements.multiplayerScreen) {
+            console.log("[Multiplayer] Showing multiplayer screen");
             this.elements.multiplayerScreen.style.display = "flex";
             this.setupMultiplayerUI();
+          } else {
+            console.error("[Multiplayer] multiplayerScreen element not found!");
           }
         });
       }
