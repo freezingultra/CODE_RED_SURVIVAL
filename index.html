@@ -802,6 +802,87 @@
     </div>
   </div>
 
+  <div id="multiplayerScreen" class="overlay" style="display: none;">
+    <div class="dialog" style="max-width: 600px;">
+      <h2>🌐 Global Multiplayer</h2>
+      <p style="color: #aaa; margin-bottom: 20px;">Play with friends on the same internet!</p>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+        <button id="createGameBtn" style="font-size: 16px; padding: 15px 20px; background: linear-gradient(135deg, #00ff88, #00cc66);">
+          ➕ Create Game
+        </button>
+        <button id="joinGameBtn" style="font-size: 16px; padding: 15px 20px; background: linear-gradient(135deg, #ffaa00, #ff6600);">
+          🔗 Join Game
+        </button>
+      </div>
+
+      <div id="createGamePanel" style="display: none; margin-bottom: 20px;">
+        <h3 style="color: #00d9ff; margin-bottom: 15px;">Create New Game</h3>
+        <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">Your game code will be generated automatically</p>
+        <button id="confirmCreateBtn" style="width: 100%; padding: 12px; font-size: 16px; margin-bottom: 10px;">
+          ✨ Create & Start Waiting
+        </button>
+        <div id="gameCodeDisplay" style="display: none; text-align: center; padding: 20px; background: rgba(0,217,255,0.1); border-radius: 8px; margin-bottom: 10px;">
+          <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">Your Game Code:</p>
+          <p id="gameCode" style="color: #00d9ff; font-size: 36px; font-weight: bold; font-family: monospace; letter-spacing: 5px; margin: 0;">----</p>
+          <p style="color: #888; font-size: 12px; margin-top: 10px;">Share this code with your friend!</p>
+        </div>
+      </div>
+
+      <div id="joinGamePanel" style="display: none; margin-bottom: 20px;">
+        <h3 style="color: #00d9ff; margin-bottom: 15px;">Join Existing Game</h3>
+        <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">Enter the 4-letter code from your friend</p>
+        <input 
+          id="joinCodeInput" 
+          type="text" 
+          placeholder="e.g., AB12" 
+          maxlength="4"
+          style="
+            width: 100%;
+            padding: 12px;
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #00d9ff;
+            border-radius: 8px;
+            color: #fff;
+            text-align: center;
+            letter-spacing: 3px;
+            font-family: monospace;
+            font-weight: bold;
+            margin-bottom: 10px;
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.3);
+            outline: none;
+          "
+        />
+        <button id="confirmJoinBtn" style="width: 100%; padding: 12px; font-size: 16px;">
+          🎮 Join Game
+        </button>
+      </div>
+
+      <div id="waitingPanel" style="display: none; text-align: center; padding: 20px;">
+        <h3 style="color: #00d9ff; margin-bottom: 15px;">⏳ Waiting for Player...</h3>
+        <div style="margin: 20px 0;">
+          <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #00d9ff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        </div>
+        <p id="waitingText" style="color: #aaa; margin-bottom: 15px;">Waiting for another player to join...</p>
+        <p id="waitingCode" style="color: #00d9ff; font-size: 24px; font-weight: bold; font-family: monospace; margin-bottom: 15px;">----</p>
+        <button id="cancelWaitBtn" style="width: 100%; padding: 12px; font-size: 16px; background: #ff3366;">
+          ✖️ Cancel
+        </button>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <button id="multiplayerCloseBtn" style="width: 100%; padding: 12px; font-size: 16px;">← Back to Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
   <div id="toast" class="toast"></div>
   
   <div id="loginScreen" class="overlay" style="display: flex;">
@@ -864,6 +945,8 @@
   <!-- Supabase Client Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="promo_codes.js"></script>
+  <script src="multiplayer.config.js"></script>
+  <script src="multiplayer_client.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
