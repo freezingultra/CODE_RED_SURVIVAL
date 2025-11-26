@@ -6,7 +6,7 @@ const MULTIPLAYER_CONFIG = {
   // For local development: 'ws://localhost:3000'
   // For Render production: 'wss://your-app-name.onrender.com'
   // Leave empty to auto-detect based on current page
-  SERVER_URL: 'https://multiplayer-for-code-red.onrender.com'
+  SERVER_URL: 'wss://multiplayer-for-code-red.onrender.com'
 };
 
 class MultiplayerClient {
