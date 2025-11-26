@@ -2665,12 +2665,19 @@ findPathAStar(startX, startY, endX, endY) {
         multiplayerBtn.addEventListener("click", () => {
           console.log("[Multiplayer] Button clicked");
           this.elements.homeScreen.style.display = "none";
+          
+          // Fetch multiplayerScreen if not already cached
+          if (!this.elements.multiplayerScreen) {
+            this.elements.multiplayerScreen = document.getElementById("multiplayerScreen");
+            console.log("[Multiplayer] Fetched multiplayerScreen from DOM:", this.elements.multiplayerScreen ? "found" : "not found");
+          }
+          
           if (this.elements.multiplayerScreen) {
             console.log("[Multiplayer] Showing multiplayer screen");
             this.elements.multiplayerScreen.style.display = "flex";
             this.setupMultiplayerUI();
           } else {
-            console.error("[Multiplayer] multiplayerScreen element not found!");
+            console.error("[Multiplayer] multiplayerScreen element not found in DOM!");
           }
         });
       }
