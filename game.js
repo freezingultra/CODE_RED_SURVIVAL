@@ -717,41 +717,41 @@
       this.kills = 0;
       this.weaponIndex = 0;
       this.weapons = [
-        { name: "Pistol", dmg: 18, bullets: 1, spread: 4, fireRate: 0.22 },
-        { name: "Shotgun", dmg: 10, bullets: 5, spread: 18, fireRate: 0.85 },
-        { name: "Burst", dmg: 12, bullets: 3, spread: 6, fireRate: 0.45 },
-        { name: "Sniper", dmg: 75, bullets: 1, spread: 0.5, fireRate: 0.9 },
-        { name: "Railgun", dmg: 0, bullets: 1, spread: 0, fireRate: 60, isMelee: false, isRailgun: true },
-        { name: "SMG", dmg: 8, bullets: 1, spread: 6, fireRate: 0.08 },
-        { name: "Flamethrower", dmg: 6, bullets: 6, spread: 20, fireRate: 0.12 },
-        { name: "Plasma", dmg: 40, bullets: 1, spread: 2, fireRate: 0.6 },
-        { name: "LaserSweep", dmg: 25, bullets: 1, spread: 0.5, fireRate: 1.5 },
-        { name: "Rocket", dmg: 120, bullets: 1, spread: 3, fireRate: 1.8 },
+        { name: "Pistol", dmg: 18, bullets: 1, spread: 4, fireRate: 0.22, magSize: 12 },
+        { name: "Shotgun", dmg: 10, bullets: 5, spread: 18, fireRate: 0.85, magSize: 6 },
+        { name: "Burst", dmg: 12, bullets: 3, spread: 6, fireRate: 0.45, magSize: 24 },
+        { name: "Sniper", dmg: 75, bullets: 1, spread: 0.5, fireRate: 0.9, magSize: 5 },
+        { name: "Railgun", dmg: 0, bullets: 1, spread: 0, fireRate: 60, isMelee: false, isRailgun: true, magSize: 1 },
+        { name: "SMG", dmg: 8, bullets: 1, spread: 6, fireRate: 0.08, magSize: Math.round(67 * 6.7) }, // 6.7x ammo for high fire rate
+        { name: "Flamethrower", dmg: 6, bullets: 6, spread: 20, fireRate: 0.12, magSize: Math.round(60 * 6.7) }, // 6.7x ammo for high fire rate
+        { name: "Plasma", dmg: 40, bullets: 1, spread: 2, fireRate: 0.6, magSize: 15 },
+        { name: "LaserSweep", dmg: 25, bullets: 1, spread: 0.5, fireRate: 1.5, magSize: 10 },
+        { name: "Rocket", dmg: 120, bullets: 1, spread: 3, fireRate: 1.8, magSize: 3 },
         // Rainbow Weapons (indices 10-39)
-        { name: "💎 TimeBlaster", dmg: 200, bullets: 1, spread: 0, fireRate: 0.8 },
-        { name: "💎 VortexCannon", dmg: 300, bullets: 3, spread: 15, fireRate: 1.2 },
-        { name: "💎 NeutronBomb", dmg: 500, bullets: 1, spread: 5, fireRate: 2.5 },
-        { name: "💎 PhasingLaser", dmg: 250, bullets: 1, spread: 1, fireRate: 0.5 },
-        { name: "💎 GravityWell", dmg: 350, bullets: 2, spread: 20, fireRate: 1.5 },
-        { name: "💎 StormStrike", dmg: 180, bullets: 8, spread: 40, fireRate: 0.6 },
-        { name: "💎 InfernoBlast", dmg: 400, bullets: 5, spread: 25, fireRate: 1.8 },
-        { name: "💎 IceShatter", dmg: 220, bullets: 6, spread: 18, fireRate: 1.0 },
-        { name: "💎 SonicBoom", dmg: 280, bullets: 1, spread: 2, fireRate: 0.4 },
-        { name: "💎 DimensionRip", dmg: 420, bullets: 2, spread: 10, fireRate: 2.0 },
-        { name: "💎 QuantumShot", dmg: 350, bullets: 4, spread: 12, fireRate: 0.9 },
-        { name: "💎 CelestialRay", dmg: 500, bullets: 1, spread: 0.5, fireRate: 3.0 },
-        { name: "💎 VoidPulse", dmg: 380, bullets: 3, spread: 8, fireRate: 1.3 },
-        { name: "💎 PhoenixFlare", dmg: 450, bullets: 6, spread: 30, fireRate: 1.6 },
-        { name: "💎 FrostNova", dmg: 320, bullets: 10, spread: 35, fireRate: 0.8 },
-        { name: "💎 ThunderStorm", dmg: 290, bullets: 7, spread: 45, fireRate: 0.7 },
-        { name: "💎 ShadowStrike", dmg: 400, bullets: 2, spread: 5, fireRate: 1.1 },
-        { name: "💎 LightBurst", dmg: 380, bullets: 8, spread: 20, fireRate: 1.2 },
-        { name: "💎 ObsidianBolt", dmg: 520, bullets: 1, spread: 1, fireRate: 2.8 },
-        { name: "💎 PrismShatter", dmg: 360, bullets: 12, spread: 50, fireRate: 0.9 },
-        { name: "💎 CosmicFury", dmg: 600, bullets: 1, spread: 3, fireRate: 4.0 },
-        { name: "💎 AbyssalWave", dmg: 480, bullets: 5, spread: 15, fireRate: 1.7 },
-        { name: "💎 EchoingBlade", dmg: 410, bullets: 3, spread: 25, fireRate: 1.4 },
-        { name: "💎 InfinityGun", dmg: 999, bullets: 1, spread: 0, fireRate: 10.0 }
+        { name: " TimeBlaster", dmg: 200, bullets: 1, spread: 0, fireRate: 0.8, magSize: 20 },
+        { name: " VortexCannon", dmg: 300, bullets: 3, spread: 15, fireRate: 1.2, magSize: 12 },
+        { name: " NeutronBomb", dmg: 500, bullets: 1, spread: 5, fireRate: 2.5, magSize: 3 },
+        { name: " PhasingLaser", dmg: 250, bullets: 1, spread: 1, fireRate: 0.5, magSize: 25 },
+        { name: " GravityWell", dmg: 350, bullets: 2, spread: 20, fireRate: 1.5, magSize: 8 },
+        { name: " StormStrike", dmg: 180, bullets: 8, spread: 40, fireRate: 0.6, magSize: 16 },
+        { name: " InfernoBlast", dmg: 400, bullets: 5, spread: 25, fireRate: 1.8, magSize: 10 },
+        { name: " IceShatter", dmg: 220, bullets: 6, spread: 18, fireRate: 1.0, magSize: 12 },
+        { name: " SonicBoom", dmg: 280, bullets: 1, spread: 2, fireRate: 0.4, magSize: 30 },
+        { name: " DimensionRip", dmg: 420, bullets: 2, spread: 10, fireRate: 2.0, magSize: 6 },
+        { name: " QuantumShot", dmg: 350, bullets: 4, spread: 12, fireRate: 0.9, magSize: 16 },
+        { name: " CelestialRay", dmg: 500, bullets: 1, spread: 0.5, fireRate: 3.0, magSize: 4 },
+        { name: " VoidPulse", dmg: 380, bullets: 3, spread: 8, fireRate: 1.3, magSize: 12 },
+        { name: " PhoenixFlare", dmg: 450, bullets: 6, spread: 30, fireRate: 1.6, magSize: 10 },
+        { name: " FrostNova", dmg: 320, bullets: 10, spread: 35, fireRate: 0.8, magSize: 15 },
+        { name: " ThunderStorm", dmg: 290, bullets: 7, spread: 45, fireRate: 0.7, magSize: 14 },
+        { name: " ShadowStrike", dmg: 400, bullets: 2, spread: 5, fireRate: 1.1, magSize: 8 },
+        { name: " LightBurst", dmg: 380, bullets: 8, spread: 20, fireRate: 1.2, magSize: 12 },
+        { name: " ObsidianBolt", dmg: 520, bullets: 1, spread: 1, fireRate: 2.8, magSize: 5 },
+        { name: " PrismShatter", dmg: 360, bullets: 12, spread: 50, fireRate: 0.9, magSize: 20 },
+        { name: " CosmicFury", dmg: 600, bullets: 1, spread: 3, fireRate: 4.0, magSize: 3 },
+        { name: " AbyssalWave", dmg: 480, bullets: 5, spread: 15, fireRate: 1.7, magSize: 10 },
+        { name: " EchoingBlade", dmg: 410, bullets: 3, spread: 25, fireRate: 1.4, magSize: 12 },
+        { name: " InfinityGun", dmg: 999, bullets: 1, spread: 0, fireRate: 10.0, magSize: 1 }
       ];
       this.unlockedWeapons = [0];
       this.shootCooldown = 0;
@@ -763,9 +763,10 @@
       this.color = isP1 ? (perm.playerColor || "#00d9ff") : "#00ff88";
       this.isP1 = isP1;
       this.canShoot = true;
-      this.magAmmo = 0;
+      this.magAmmo = this.weapons[0].magSize; // Initialize with first weapon's mag size
       this.reloadTimer = 0;
       this.railgunSpinAngle = 0;
+      this.reloadKeyPressed = false; // Track if R key was pressed to prevent continuous reload
       
       // Apply permanent upgrades if this is player 1
       if (isP1) {
@@ -853,10 +854,31 @@
       this.y = clamp(this.y, this.radius, world.mapH * world.tileSize - this.radius);
 
       this.shootCooldown -= dt;
-      this.reloadTimer -= dt;
+      this.reloadTimer = Math.max(0, this.reloadTimer - dt);
       const weapon = this.weapons[this.weaponIndex];
-      if (weapon.magSize !== undefined && this.reloadTimer <= 0 && this.magAmmo < weapon.magSize) {
-        this.magAmmo = weapon.magSize;
+      
+      // Handle reloading when R is pressed or when out of ammo
+      if (weapon.magSize !== undefined) {
+        // Start reload if R is pressed and not already reloading
+        if (Input.keys['r'] && !this.reloadKeyPressed && this.reloadTimer <= 0 && this.magAmmo < weapon.magSize) {
+          this.reloadTimer = 3; // 3 second reload time
+          this.reloadKeyPressed = true;
+        }
+        
+        // Reset the reload key flag when R is released
+        if (!Input.keys['r']) {
+          this.reloadKeyPressed = false;
+        }
+        
+        // Auto-reload when firing with an empty magazine
+        if (this.magAmmo <= 0 && this.reloadTimer <= 0) {
+          this.reloadTimer = 3; // 3 second reload time
+        }
+        
+        // Handle magazine refill after reload timer finishes
+        if (this.reloadTimer <= 0 && this.magAmmo < weapon.magSize) {
+          this.magAmmo = weapon.magSize;
+        }
       }
       if (this.canShoot && (Input.mouse.down || Input.keys[' ']) && this.shootCooldown <= 0) {
         this.fire(world);
@@ -865,7 +887,24 @@
 
     fire(world) {
       const weapon = this.weapons[this.weaponIndex];
-      if (weapon.magSize !== undefined && (this.magAmmo <= 0 || this.reloadTimer > 0)) return;
+      // Only check magazine if the weapon has one
+      if (weapon.magSize !== undefined) {
+        // Don't fire if reloading or no ammo
+        if (this.reloadTimer > 0) return false;
+        if (this.magAmmo <= 0) {
+          // Start reloading if empty
+          this.reloadTimer = 3; // 3 second reload time
+          return false;
+        }
+        
+        // Decrement ammo and check if we need to auto-reload
+        this.magAmmo--;
+        
+        // Auto-reload when magazine is empty
+        if (this.magAmmo <= 0) {
+          this.reloadTimer = 3; // 3 second reload time
+        }
+      }
       
       // Special Railgun handling
       if (weapon.isRailgun) {
@@ -899,7 +938,14 @@
       }
       
       this.shootCooldown = weapon.fireRate;
-      const angle = Math.atan2(Input.mouse.y + world.camera.y - this.y, Input.mouse.x + world.camera.x - this.x);
+      let angle;
+      if (world.isMultiplayer) {
+        const cam = this.isP1 ? world.camera1 : world.camera2;
+        const mouseY = this.isP1 ? Input.mouse.y : Input.mouse.y - world.canvas.height / 2;
+        angle = Math.atan2(mouseY + cam.y - this.y, Input.mouse.x + cam.x - this.x);
+      } else {
+        angle = Math.atan2(Input.mouse.y + world.camera.y - this.y, Input.mouse.x + world.camera.x - this.x);
+      }
 
       for (let i = 0; i < weapon.bullets; i++) {
         const spread = (Math.random() - 0.5) * (weapon.spread * Math.PI / 180);
@@ -981,22 +1027,6 @@
         ctx.restore();
       }
       
-      // Ammo counter (kept below player)
-      if (this.weapons[this.weaponIndex] && this.magAmmo > 0) {
-        ctx.save();
-        ctx.font = 'bold 12px Arial';
-        ctx.fillStyle = this.color;
-        ctx.textAlign = 'center';
-        ctx.fillText(`${this.magAmmo}`, 0, this.radius + 15);
-        
-        // Reload indicator
-        if (this.reloadTimer > 0) {
-          ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
-          ctx.fillText('RELOADING', 0, this.radius + 30);
-        }
-        
-        ctx.restore();
-      }
       
       ctx.restore();
     }
@@ -1663,6 +1693,134 @@ findPathAStar(startX, startY, endX, endY) {
       this.loots = [];
       Log.info("Multiplayer started! P1 hunt P2 for 5 min");
       UI.showToast("Multiplayer: P1 hunt P2!");
+    }
+
+    startMultiplayerGame(gameCode, mapSeed, isCreator) {
+      // Use the provided map seed for consistent map generation
+      this.mapSeed = mapSeed;
+      
+      // Regenerate maze with seed for consistency
+      this.generateMazeWithSeed(mapSeed);
+      
+      // Initialize multiplayer client
+      this.multiplayerClient = new MultiplayerClient();
+      this.isMultiplayer = true;
+      this.isGlobalMultiplayer = true;
+      this.gameCode = gameCode;
+      this.isCreator = isCreator;
+      
+      // Setup multiplayer event listeners
+      this.multiplayerClient.on('joined', (data) => {
+        this.player.color = data.playerColor;
+        Log.info("Joined multiplayer game: " + gameCode);
+        UI.showToast("Connected to multiplayer game!");
+        this.startWave();
+      });
+
+      this.multiplayerClient.on('player_joined', (data) => {
+        Log.info("Player joined: " + data.playerName);
+        UI.showToast(data.playerName + " joined the game!");
+      });
+
+      this.multiplayerClient.on('player_update', (data) => {
+        if (this.player2) {
+          this.player2.x = data.x;
+          this.player2.y = data.y;
+          this.player2.hp = data.hp;
+          this.player2.weaponIndex = data.weaponIndex;
+        }
+      });
+
+      this.multiplayerClient.on('player_left', () => {
+        Log.info("Other player disconnected");
+        UI.showToast("Other player disconnected!");
+        this.gameOver();
+      });
+
+      this.multiplayerClient.on('disconnected', () => {
+        Log.info("Disconnected from multiplayer server");
+        if (this.isRunning) {
+          UI.showToast("Connection lost!");
+          this.gameOver();
+        }
+      });
+
+      this.multiplayerClient.on('error', (data) => {
+        Log.error("Multiplayer error:", data);
+        UI.showToast("Multiplayer error: " + data.message);
+      });
+
+      // Connect to server (uses configured Render URL from multiplayer_client.js)
+      this.multiplayerClient.connect(gameCode, this.userName).then(() => {
+        Log.info("Multiplayer connection established");
+        
+        // Initialize player2 (remote player)
+        this.player2 = new Player(
+          this.mapW * this.tileSize / 2 + randRange(200, 500),
+          this.mapH * this.tileSize / 2 + randRange(200, 500),
+          false
+        );
+        this.player2.color = this.multiplayerClient.playerColor === "#00d9ff" ? "#00ff88" : "#00d9ff";
+        
+        this.isRunning = true;
+        this.startWave();
+      }).catch(error => {
+        Log.error("Failed to connect to multiplayer:", error);
+        UI.showToast("Failed to connect to multiplayer server!");
+      });
+    }
+
+    generateMazeWithSeed(seed) {
+      // Use seed to generate deterministic maze
+      const seededRandom = (s) => {
+        const x = Math.sin(s) * 10000;
+        return x - Math.floor(x);
+      };
+
+      this.map.fill(1);
+      const roomSize = 8, corridorWidth = 3;
+      
+      for (let ry = 0; ry < Math.floor(this.mapH / roomSize); ry++) {
+        for (let rx = 0; rx < Math.floor(this.mapW / roomSize); rx++) {
+          const roomX = rx * roomSize, roomY = ry * roomSize;
+          for (let y = 1; y < roomSize - 1; y++) {
+            for (let x = 1; x < roomSize - 1; x++) {
+              const mx = roomX + x, my = roomY + y;
+              if (mx > 0 && my > 0 && mx < this.mapW - 1 && my < this.mapH - 1) {
+                this.map[my * this.mapW + mx] = 0;
+              }
+            }
+          }
+          if (rx < Math.floor(this.mapW / roomSize) - 1 && seededRandom(seed + rx + ry * 100) > 0.3) {
+            for (let x = roomSize - 1; x < roomSize + corridorWidth; x++) {
+              for (let y = Math.floor(roomSize / 3); y < Math.floor(roomSize * 2 / 3); y++) {
+                const mx = roomX + x, my = roomY + y;
+                if (mx > 0 && my > 0 && mx < this.mapW - 1 && my < this.mapH - 1) {
+                  this.map[my * this.mapW + mx] = 0;
+                }
+              }
+            }
+          }
+          if (ry < Math.floor(this.mapH / roomSize) - 1 && seededRandom(seed + rx * 100 + ry) > 0.3) {
+            for (let y = roomSize - 1; y < roomSize + corridorWidth; y++) {
+              for (let x = Math.floor(roomSize / 3); x < Math.floor(roomSize * 2 / 3); x++) {
+                const mx = roomX + x, my = roomY + y;
+                if (mx > 0 && my > 0 && mx < this.mapW - 1 && my < this.mapH - 1) {
+                  this.map[my * this.mapW + mx] = 0;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      const cx = Math.floor(this.mapW / 2), cy = Math.floor(this.mapH / 2);
+      for (let yy = -6; yy <= 6; yy++) {
+        for (let xx = -6; xx <= 6; xx++) {
+          const idx = (cy + yy) * this.mapW + (cx + xx);
+          if (idx >= 0 && idx < this.map.length) this.map[idx] = 0;
+        }
+      }
     }
 
     async gameOver() {
@@ -2504,9 +2662,11 @@ findPathAStar(startX, startY, endX, endY) {
       const multiplayerBtn = document.getElementById("multiplayerBtn");
       if (multiplayerBtn) {
         multiplayerBtn.addEventListener("click", () => {
-          this.hideAll();
-          if (window.game && window.game.world) {
-            window.game.world.startMultiplayer();
+          this.elements.homeScreen.style.display = "none";
+          this.elements.multiplayerScreen = document.getElementById("multiplayerScreen");
+          if (this.elements.multiplayerScreen) {
+            this.elements.multiplayerScreen.style.display = "flex";
+            this.setupMultiplayerUI();
           }
         });
       }
@@ -2937,6 +3097,8 @@ findPathAStar(startX, startY, endX, endY) {
           if (world.player.unlockedWeapons.includes(nextIndex)) {
             world.player.weaponIndex = nextIndex;
             world.player.shootCooldown = 0; // Reset cooldown when switching weapons
+            world.player.magAmmo = world.player.weapons[nextIndex].magSize; // Reset ammo to full when switching
+            world.player.reloadTimer = 0; // Reset reload timer
             this.showToast("Switched to " + world.player.weapons[world.player.weaponIndex].name);
           }
         }
@@ -2975,6 +3137,9 @@ findPathAStar(startX, startY, endX, endY) {
       
       this.elements.currentWeapon.textContent = world.player.weapons[world.player.weaponIndex].name;
       
+      const weapon = world.player.weapons[world.player.weaponIndex];
+      const hasMagazine = weapon.magSize !== undefined;
+      
       // Add or update the bottom left weapon display
       let weaponDisplay = document.getElementById('bottomWeaponDisplay');
       if (!weaponDisplay) {
@@ -2990,7 +3155,8 @@ findPathAStar(startX, startY, endX, endY) {
         weaponDisplay.style.zIndex = '100';
         document.body.appendChild(weaponDisplay);
       }
-      weaponDisplay.textContent = world.player.weapons[world.player.weaponIndex].name;
+      weaponDisplay.textContent = weapon.name;
+      
       
       const armorDisplay = document.getElementById("armorDisplay");
       const armorBar = document.getElementById("armorBar");
@@ -3265,7 +3431,7 @@ findPathAStar(startX, startY, endX, endY) {
               UI.showToast("Plasma unlocked! Carry over to all games!");
             }
           }},
-          { name: "Unlock Laser Sweep", desc: "Precision sweeping laser", cost: 140, apply: () => {
+          { name: "Unlock LaserSweep", desc: "Precision sweeping laser", cost: 140, apply: () => {
             if (!upgrades.unlockedWeapons.includes(8)) {
               upgrades.unlockedWeapons.push(8);
               if (!world.player.unlockedWeapons.includes(8)) world.player.unlockedWeapons.push(8);
@@ -3836,31 +4002,42 @@ findPathAStar(startX, startY, endX, endY) {
 
     populatePromoScreen() {
       const input = document.getElementById('promoInput');
-      const msg = document.getElementById('promoMessage');
-      if (input) input.value = '';
-      if (msg) msg.textContent = '';
     },
-
+    
     redeemPromo(code) {
       const c = (code || '').toString().trim();
       const msg = document.getElementById('promoMessage');
+      const input = document.querySelector('#promoInput');
+      
       if (!c) {
-        if (msg) msg.textContent = 'Please enter a promo code.';
+        if (msg) {
+          msg.textContent = 'Please enter a promo code.';
+          msg.style.color = '#ff4444';
+        }
         UI.showToast('Enter a promo code');
         return;
       }
 
       const codes = this.promoCodes || [];
       const found = codes.find(p => p.code.toUpperCase() === c.toUpperCase());
+      
       if (!found) {
-        if (msg) msg.textContent = 'Invalid promo code.';
+        if (msg) {
+          msg.textContent = 'Invalid promo code.';
+          msg.style.color = '#ff4444';
+        }
         UI.showToast('Invalid promo code');
         return;
       }
 
-      const redeemedCodes = JSON.parse(localStorage.getItem('redeemedCodes')) || [];
-      if (redeemedCodes.includes(c.toUpperCase())) {
-        if (msg) msg.textContent = 'You have already redeemed this code.';
+      const redeemedCodes = JSON.parse(localStorage.getItem('redeemedCodes') || '[]');
+      
+      // Check if the code has already been redeemed
+      if (redeemedCodes.some(rc => typeof rc === 'string' ? rc === c.toUpperCase() : rc.code === c.toUpperCase())) {
+        if (msg) {
+          msg.textContent = 'You have already redeemed this code.';
+          msg.style.color = '#ff8800';
+        }
         UI.showToast('Promo code already redeemed');
         return;
       }
@@ -3874,30 +4051,50 @@ findPathAStar(startX, startY, endX, endY) {
       upgrades.redGems = (upgrades.redGems || 0) + rg;
       PermanentUpgrades.save(upgrades);
 
-      // Add the code to the redeemed list
-      redeemedCodes.push(c.toUpperCase());
+      // Add the code to the redeemed list with timestamp
+      redeemedCodes.push({
+        code: c.toUpperCase(),
+        redeemedAt: new Date().toISOString(),
+        rewards: { rainbow: r, redGems: rg }
+      });
       localStorage.setItem('redeemedCodes', JSON.stringify(redeemedCodes));
 
       // Apply to active player if present
       try {
-        if (window.game && window.game.world && window.game.world.player) {
+        if (window.game?.world?.player) {
           window.game.world.player.rainbowCrystals = (window.game.world.player.rainbowCrystals || 0) + r;
           window.game.world.player.redGems = (window.game.world.player.redGems || 0) + rg;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('Error applying promo to player:', e);
+      }
 
       // Update HUD and upgrades display
       const rcEl = document.getElementById('rainbowCrystalCount');
       const redEl = document.getElementById('redGemCount');
       const upRC = document.getElementById('upgradesRainbowCrystals');
       const upRed = document.getElementById('upgradesRedGems');
+      
       if (rcEl) rcEl.textContent = Math.floor(upgrades.rainbowCrystals || 0);
       if (redEl) redEl.textContent = Math.floor(upgrades.redGems || 0);
       if (upRC) upRC.textContent = Math.floor(upgrades.rainbowCrystals || 0);
       if (upRed) upRed.textContent = Math.floor(upgrades.redGems || 0);
 
-      if (msg) msg.textContent = `Redeemed ${found.code}: +${r} 🌈, +${rg} 🔴`;
-      UI.showToast('Promo redeemed! Rewards applied');
+      // Show success message
+      if (msg) {
+        let rewardText = [];
+        if (r > 0) rewardText.push(`${r} Rainbow Crystals`);
+        if (rg > 0) rewardText.push(`${rg} Red Gems`);
+        
+        msg.textContent = `Successfully redeemed ${found.code}! Received: ${rewardText.join(' and ')}`;
+        msg.style.color = '#4CAF50';
+      }
+      
+      // Clear the input field
+      if (input) input.value = '';
+      
+      UI.showToast('Promo code redeemed successfully!');
+      if (this.populatePromoScreen) this.populatePromoScreen(); // Refresh the promo screen if available
     },
 
     updatePlayerColorPreview(canvasEl, primary, secondary) {
@@ -3919,6 +4116,181 @@ findPathAStar(startX, startY, endX, endY) {
       toast.textContent = msg;
       toast.classList.add("show");
       setTimeout(() => toast.classList.remove("show"), 2200);
+    },
+
+    setupMultiplayerUI() {
+      const createBtn = document.getElementById("createGameBtn");
+      const joinBtn = document.getElementById("joinGameBtn");
+      const confirmCreateBtn = document.getElementById("confirmCreateBtn");
+      const confirmJoinBtn = document.getElementById("confirmJoinBtn");
+      const cancelWaitBtn = document.getElementById("cancelWaitBtn");
+      const multiplayerCloseBtn = document.getElementById("multiplayerCloseBtn");
+
+      const createPanel = document.getElementById("createGamePanel");
+      const joinPanel = document.getElementById("joinGamePanel");
+      const waitingPanel = document.getElementById("waitingPanel");
+
+      // Create Game button
+      if (createBtn) {
+        createBtn.onclick = () => {
+          createPanel.style.display = "block";
+          joinPanel.style.display = "none";
+          waitingPanel.style.display = "none";
+        };
+      }
+
+      // Join Game button
+      if (joinBtn) {
+        joinBtn.onclick = () => {
+          createPanel.style.display = "none";
+          joinPanel.style.display = "block";
+          waitingPanel.style.display = "none";
+          document.getElementById("joinCodeInput").focus();
+        };
+      }
+
+      // Confirm Create button
+      if (confirmCreateBtn) {
+        confirmCreateBtn.onclick = async () => {
+          try {
+            confirmCreateBtn.disabled = true;
+            confirmCreateBtn.textContent = "Creating...";
+
+            const api = new MultiplayerAPI();
+            const result = await api.createGame(window.game.world.userName, Math.random());
+
+            const gameCode = result.code;
+            const mapSeed = result.mapSeed;
+
+            // Show waiting panel
+            createPanel.style.display = "none";
+            waitingPanel.style.display = "block";
+            document.getElementById("gameCode").textContent = gameCode;
+            document.getElementById("waitingCode").textContent = gameCode;
+
+            // Store for later use
+            window.multiplayerGameCode = gameCode;
+            window.multiplayerMapSeed = mapSeed;
+            window.multiplayerIsCreator = true;
+
+            // Start waiting for player
+            UI.waitForMultiplayerPlayer(gameCode, mapSeed);
+          } catch (error) {
+            console.error("Failed to create game:", error);
+            UI.showToast("Failed to create game. Check server connection.");
+            confirmCreateBtn.disabled = false;
+            confirmCreateBtn.textContent = "✨ Create & Start Waiting";
+          }
+        };
+      }
+
+      // Confirm Join button
+      if (confirmJoinBtn) {
+        confirmJoinBtn.onclick = async () => {
+          const code = document.getElementById("joinCodeInput").value.toUpperCase();
+
+          if (!code || code.length !== 4) {
+            UI.showToast("Enter a valid 4-letter code!");
+            return;
+          }
+
+          try {
+            confirmJoinBtn.disabled = true;
+            confirmJoinBtn.textContent = "Joining...";
+
+            const api = new MultiplayerAPI();
+            const result = await api.joinGame(code, window.game.world.userName);
+
+            const mapSeed = result.mapSeed;
+
+            // Store for later use
+            window.multiplayerGameCode = code;
+            window.multiplayerMapSeed = mapSeed;
+            window.multiplayerIsCreator = false;
+
+            // Start game immediately
+            UI.startMultiplayerGame(code, mapSeed, false);
+          } catch (error) {
+            console.error("Failed to join game:", error);
+            UI.showToast("Game not found or is full!");
+            confirmJoinBtn.disabled = false;
+            confirmJoinBtn.textContent = "🎮 Join Game";
+          }
+        };
+      }
+
+      // Cancel Wait button
+      if (cancelWaitBtn) {
+        cancelWaitBtn.onclick = () => {
+          window.multiplayerGameCode = null;
+          window.multiplayerMapSeed = null;
+          createPanel.style.display = "none";
+          joinPanel.style.display = "none";
+          waitingPanel.style.display = "none";
+          this.elements.multiplayerScreen.style.display = "none";
+          this.elements.homeScreen.style.display = "flex";
+        };
+      }
+
+      // Close button
+      if (multiplayerCloseBtn) {
+        multiplayerCloseBtn.onclick = () => {
+          window.multiplayerGameCode = null;
+          window.multiplayerMapSeed = null;
+          createPanel.style.display = "none";
+          joinPanel.style.display = "none";
+          waitingPanel.style.display = "none";
+          this.elements.multiplayerScreen.style.display = "none";
+          this.elements.homeScreen.style.display = "flex";
+        };
+      }
+    },
+
+    async waitForMultiplayerPlayer(gameCode, mapSeed) {
+      const api = new MultiplayerAPI();
+      let checkCount = 0;
+      const maxChecks = 120; // 2 minutes max wait
+
+      const checkInterval = setInterval(async () => {
+        checkCount++;
+
+        try {
+          const info = await api.getGameInfo(gameCode);
+
+          if (info.playerCount >= 2) {
+            clearInterval(checkInterval);
+            UI.startMultiplayerGame(gameCode, mapSeed, true);
+          } else if (checkCount >= maxChecks) {
+            clearInterval(checkInterval);
+            UI.showToast("Waiting timeout. Returning to menu.");
+            setTimeout(() => {
+              document.getElementById("createGamePanel").style.display = "none";
+              document.getElementById("waitingPanel").style.display = "none";
+              this.elements.multiplayerScreen.style.display = "none";
+              this.elements.homeScreen.style.display = "flex";
+            }, 1000);
+          }
+        } catch (error) {
+          console.error("Error checking game status:", error);
+        }
+      }, 1000);
+    },
+
+    async startMultiplayerGame(gameCode, mapSeed, isCreator) {
+      try {
+        // Hide UI
+        this.hideAll();
+        const shopBtn = document.getElementById("shopButton");
+        if (shopBtn) shopBtn.style.display = "block";
+
+        // Start the game with multiplayer
+        if (window.game && window.game.world) {
+          window.game.world.startMultiplayerGame(gameCode, mapSeed, isCreator);
+        }
+      } catch (error) {
+        console.error("Failed to start multiplayer game:", error);
+        UI.showToast("Failed to start multiplayer game!");
+      }
     }
   };
 
