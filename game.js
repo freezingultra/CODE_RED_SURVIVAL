@@ -2656,7 +2656,8 @@ findPathAStar(startX, startY, endX, endY) {
         ,
         customizeScreen: document.getElementById("customizeScreen"),
         controlsScreen: document.getElementById("controlsScreen"),
-        promoScreen: document.getElementById("promoScreen")
+        promoScreen: document.getElementById("promoScreen"),
+        multiplayerScreen: document.getElementById("multiplayerScreen")
       };
       
       const multiplayerBtn = document.getElementById("multiplayerBtn");
