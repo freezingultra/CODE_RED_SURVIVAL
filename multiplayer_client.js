@@ -25,17 +25,8 @@ class MultiplayerClient {
       return MULTIPLAYER_CONFIG.SERVER_URL;
     }
 
-    // Auto-detect based on current page
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-
-    // If localhost, use localhost:3000 for development
-    if (host.includes('localhost') || host.includes('127.0.0.1')) {
-      return 'ws://localhost:3000';
-    }
-
-    // Otherwise, use same host as the page (for Render, Netlify, etc.)
-    return `${protocol}//${host}`;
+    // Use the multiplayer server URL
+    return 'wss://multiplayer-for-code-red.onrender.com';
   }
 
   // Register callback for events
