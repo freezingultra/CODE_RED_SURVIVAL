@@ -19,7 +19,7 @@ const MULTIPLAYER_CONFIG = {
   // SERVER_URL: 'wss://your-app-name.herokuapp.com'
   
   // Leave empty to auto-detect based on current page:
-  SERVER_URL: 'wss://code-red-survival.onrender.com',
+  SERVER_URL: 'wss://multiplayer-for-code-red.onrender.com',
   
   // ========================================
   // Optional: Game settings
