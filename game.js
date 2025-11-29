@@ -4428,28 +4428,6 @@ findPathAStar(startX, startY, endX, endY) {
     loop() {
       if (!this.running) return;
       
-      const now = performance.now();
-      let dt = (now - this.lastTime) / 1000;
-      if (dt > 0.1) dt = 0.1;
-      this.lastTime = now;
-      
-      if (this.world && !this.devConsole.isOpen) {
-        try {
-          this.world.update(dt);
-          this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-          this.world.draw();
-        } catch (error) {
-          Log.error("Game loop error:", error);
-          this.running = false;
-          alert("Game crashed! Check console (F12) for details. Reloading...");
-          location.reload();
-        }
-      }
-      
-      requestAnimationFrame(() => this.loop());
-    }
-
-    resize() {
       this.canvas.width = Math.max(640, window.innerWidth);
       this.canvas.height = Math.max(480, window.innerHeight);
       if (this.world) {
