@@ -260,15 +260,14 @@ class MultiplayerClient {
 
 // REST API helper for game creation/joining
 class MultiplayerAPI {
-  constructor(apiUrl = 'http://localhost:3000') {
+  constructor(apiUrl = 'https://multiplayer-for-code-red.onrender.com') {
     this.apiUrl = apiUrl;
   }
 
   // Create a new game room
   async createGame(playerName, mapSeed) {
     try {
-      const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-      const url = `${protocol}//${window.location.host}/api/games/create`;
+      const url = `${this.apiUrl}/api/games/create`;
 
       const response = await fetch(url, {
         method: 'POST',
@@ -290,8 +289,7 @@ class MultiplayerAPI {
   // Join an existing game room
   async joinGame(code, playerName) {
     try {
-      const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-      const url = `${protocol}//${window.location.host}/api/games/join`;
+      const url = `${this.apiUrl}/api/games/join`;
 
       const response = await fetch(url, {
         method: 'POST',

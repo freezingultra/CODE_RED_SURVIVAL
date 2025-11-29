@@ -2797,16 +2797,8 @@ findPathAStar(startX, startY, endX, endY) {
       }
       
       // Load promo codes JSON for redemption (if available)
-      // Initialize from JS fallback immediately to avoid race conditions
+      // Initialize from JS fallback
       this.promoCodes = window.PROMO_CODES || [];
-      try {
-        fetch('./promo_codes.json').then(r => {
-          if (!r.ok) throw new Error('no-json');
-          return r.json();
-        }).then(data => { this.promoCodes = data || window.PROMO_CODES || []; }).catch(()=>{ this.promoCodes = window.PROMO_CODES || []; });
-      } catch (e) {
-        this.promoCodes = window.PROMO_CODES || [];
-      }
 
       this.bindEvents();
       this.updateHomeStats();
