@@ -84,6 +84,15 @@ class GameRoom {
 
 // REST API Endpoints
 
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'Multiplayer server is running',
+    timestamp: new Date().toISOString(),
+    activeGames: gameRooms.size
+  });
+});
+
 // Create a new game room
 app.post('/api/games/create', (req, res) => {
   const { playerName, mapSeed } = req.body;
@@ -122,21 +131,29 @@ app.post('/api/games/create', (req, res) => {
 
 // Join an existing game room
 app.post('/api/games/join', (req, res) => {
+  console.log('[SERVER] Join request received:', req.body);
+  
   const { code, playerName } = req.body;
 
   if (!code || !playerName) {
+    console.log('[SERVER] Missing code or player name');
     return res.status(400).json({ error: 'Missing code or player name' });
   }
 
   const room = gameRooms.get(code.toUpperCase());
+  console.log('[SERVER] Looking for room:', code.toUpperCase(), 'Found:', !!room);
+  
   if (!room) {
+    console.log('[SERVER] Game room not found:', code);
     return res.status(404).json({ error: 'Game room not found' });
   }
 
   if (room.players.size >= 2) {
+    console.log('[SERVER] Game room is full');
     return res.status(400).json({ error: 'Game room is full' });
   }
 
+  console.log('[SERVER] Successfully joining game:', code);
   res.json({
     success: true,
     code: room.code,
