@@ -311,8 +311,7 @@ class MultiplayerAPI {
   // Get game room info
   async getGameInfo(code) {
     try {
-      const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-      const url = `${protocol}//${window.location.host}/api/games/${code}`;
+      const url = `${this.apiUrl}/api/games/${code}`;
 
       const response = await fetch(url);
 
