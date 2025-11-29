@@ -4321,6 +4321,11 @@ findPathAStar(startX, startY, endX, endY) {
       window.game = this;
     }
     
+    resize() {
+      this.canvas.width = Math.max(640, window.innerWidth);
+      this.canvas.height = Math.max(480, window.innerHeight);
+    }
+    
     setupLoginScreen() {
       const loginInput = document.getElementById("loginInput");
       const loginSubmitBtn = document.getElementById("loginSubmitBtn");
@@ -4438,6 +4443,8 @@ findPathAStar(startX, startY, endX, endY) {
         this.world.camera2.w = this.canvas.width;
         this.world.camera2.h = this.canvas.height / 2;
       }
+      
+      requestAnimationFrame(() => this.loop());
     }
   }
 
