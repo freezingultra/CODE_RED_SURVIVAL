@@ -1712,14 +1712,6 @@ findPathAStar(startX, startY, endX, endY) {
       // Setup multiplayer event listeners
       this.multiplayerClient.on('joined', (data) => {
         this.player.color = data.playerColor;
-        Log.info("Joined multiplayer game: " + gameCode);
-        UI.showToast("Connected to multiplayer game!");
-        this.startWave();
-      });
-
-      this.multiplayerClient.on('player_joined', (data) => {
-        Log.info("Player joined: " + data.playerName);
-        UI.showToast(data.playerName + " joined the game!");
       });
 
       this.multiplayerClient.on('player_update', (data) => {
@@ -1728,6 +1720,18 @@ findPathAStar(startX, startY, endX, endY) {
           this.player2.y = data.y;
           this.player2.hp = data.hp;
           this.player2.weaponIndex = data.weaponIndex;
+        }
+      });
+
+      this.multiplayerClient.on('player_joined', (data) => {
+        Log.info("Player joined: " + data.playerName);
+        UI.showToast(data.playerName + " joined the game!");
+        
+        // Auto-start game for host when player joins
+        if (this.isCreator && !this.isRunning) {
+          this.isRunning = true;
+          this.startWave();
+          UI.showToast("Game starting!");
         }
       });
 
