@@ -4274,7 +4274,7 @@ findPathAStar(startX, startY, endX, endY) {
 
           if (info.playerCount >= 2) {
             clearInterval(checkInterval);
-            UI.startMultiplayerGame(gameCode, mapSeed, true);
+            Log.info("Player detected by polling - waiting for WebSocket event...");
           } else if (checkCount >= maxChecks) {
             clearInterval(checkInterval);
             UI.showToast("Waiting timeout. Returning to menu.");
