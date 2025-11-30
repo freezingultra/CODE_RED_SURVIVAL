@@ -1712,6 +1712,14 @@ findPathAStar(startX, startY, endX, endY) {
       // Setup multiplayer event listeners
       this.multiplayerClient.on('joined', (data) => {
         this.player.color = data.playerColor;
+        Log.info("Joined multiplayer game: " + gameCode);
+        UI.showToast("Connected to multiplayer game!");
+        
+        // Don't start wave immediately for host - wait for player to join
+        if (!this.isCreator) {
+          this.isRunning = true;
+          this.startWave();
+        }
       });
 
       this.multiplayerClient.on('player_update', (data) => {
