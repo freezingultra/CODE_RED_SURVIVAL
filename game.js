@@ -4293,10 +4293,14 @@ findPathAStar(startX, startY, endX, endY) {
 
     async startMultiplayerGame(gameCode, mapSeed, isCreator) {
       try {
-        // Hide UI
+        // Hide UI including waiting panel
         this.hideAll();
         const shopBtn = document.getElementById("shopButton");
         if (shopBtn) shopBtn.style.display = "block";
+        
+        // Specifically hide waiting panel if it's still visible
+        const waitingPanel = document.getElementById("waitingPanel");
+        if (waitingPanel) waitingPanel.style.display = "none";
 
         // Start the game with multiplayer
         if (window.game && window.game.world) {
