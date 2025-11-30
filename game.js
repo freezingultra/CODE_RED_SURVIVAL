@@ -1763,6 +1763,7 @@ findPathAStar(startX, startY, endX, endY) {
       });
 
       // Connect to server (uses configured Render URL from multiplayer_client.js)
+      Log.info("Connecting to multiplayer with username: " + this.userName);
       this.multiplayerClient.connect(gameCode, this.userName).then(() => {
         Log.info("Multiplayer connection established");
         
