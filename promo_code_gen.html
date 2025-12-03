@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Promo Code Generator</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #0a0a0a;
+            color: #00d9ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #promo-container {
+            background: #1a1a1a;
+            border: 2px solid #00d9ff;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        #promo-code {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #ffdd00;
+        }
+        button {
+            background: #00d9ff;
+            border: none;
+            color: #0a0a0a;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="promo-container">
+        <h2>Promo Code Generator</h2>
+        <div id="promo-code"></div>
+        <button id="generate-btn">Generate</button>
+    </div>
+    <script src="promo_code_gen.js"></script>
+</body>
+</html>

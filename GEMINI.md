@@ -1,0 +1,1 @@
+ok so you have to help me on all of the tasks I give you the files you should not look at is promo_code_gen.html and promo_code_gen.py, unless instructed to use all of your ablity to do the task and reason for longer like and LRM would.

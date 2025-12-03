@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Player Sprite Generator (Local)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      html,body,#root{height:100%;margin:0;padding:0}
+      /* Pixelated rendering helper used by the canvas */
+      .pixelated { image-rendering: pixelated; }
+      /* Predefined color classes for the color picker buttons */
+      .color-00d9ff { background-color: #00d9ff; }
+      .color-ff4444 { background-color: #ff4444; }
+      .color-00ff88 { background-color: #00ff88; }
+      .color-ffdd00 { background-color: #ffdd00; }
+      .color-ff6633 { background-color: #ff6633; }
+      .color-aa00ff { background-color: #aa00ff; }
+      .color-ffffff { background-color: #ffffff; }
+      .color-333333 { background-color: #333333; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- Load the JSX app (transpiled in-browser by Babel) -->
+    <script type="text/babel" src="sprite.jsx"></script>
+    <!-- GIF encoder library -->
+    <script src="https://cdn.jsdelivr.net/npm/gif-encoder-2@1.0.5/dist/gif.js"></script>
+  </body>
+</html>
