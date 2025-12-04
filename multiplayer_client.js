@@ -182,16 +182,19 @@ class MultiplayerClient {
 
 class MultiplayerAPI {
   constructor(serverUrl = null) {
-    if (serverUrl) {
-      this.baseUrl = serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
-    } else if (config.SERVER_URL && config.SERVER_URL.trim() !== '') {
-      // Use configured server URL
+    // Always use the configured server URL if available
+    if (config.SERVER_URL && config.SERVER_URL.trim() !== '') {
       this.baseUrl = config.SERVER_URL.replace('ws://', 'http://').replace('wss://', 'https://');
+      console.log(`[MultiplayerAPI] Using configured server: ${this.baseUrl}`);
+    } else if (serverUrl) {
+      this.baseUrl = serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+      console.log(`[MultiplayerAPI] Using provided server: ${this.baseUrl}`);
     } else {
       // Auto-detect based on current page (same logic as MultiplayerClient)
       const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
       const host = window.location.host;
       this.baseUrl = `${protocol}//${host}`;
+      console.log(`[MultiplayerAPI] Auto-detected server: ${this.baseUrl}`);
     }
   }
 
