@@ -8,6 +8,9 @@ const config = typeof MULTIPLAYER_CONFIG !== 'undefined' ? MULTIPLAYER_CONFIG : 
   SERVER_URL: 'wss://multiplayer-for-code-red-survival.onrender.com'
 };
 
+// Debug: Log what config we're using
+console.log('[MultiplayerClient] Config loaded:', config);
+
 class MultiplayerClient {
   constructor(serverUrl = null) {
     this.serverUrl = serverUrl || this.getServerUrl();

@@ -19,14 +19,15 @@ const MULTIPLAYER_CONFIG = {
   // SERVER_URL: 'wss://your-app-name.herokuapp.com'
   
   // Leave empty to auto-detect based on current page:
-  SERVER_URL: 'wss://code-red-survival.onrender.com',
+  // NOTE: Using the Render multiplayer server for Code Red Survival
+  SERVER_URL: 'wss://multiplayer-for-code-red-survival.onrender.com', // Render server
   
   // ========================================
   // Optional: Game settings
   // ========================================
   
   // Maximum players per room
-  MAX_PLAYERS_PER_ROOM: 2,
+  MAX_PLAYERS_PER_ROOM: 6,
   
   // Game timeout (milliseconds)
   GAME_TIMEOUT: 3600000, // 1 hour
@@ -40,6 +41,9 @@ const MULTIPLAYER_CONFIG = {
   // Debug mode (logs to console)
   DEBUG: false
 };
+
+// Make config available globally
+window.MULTIPLAYER_CONFIG = MULTIPLAYER_CONFIG;
 
 // Export for use in multiplayer_client.js
 if (typeof module !== 'undefined' && module.exports) {
