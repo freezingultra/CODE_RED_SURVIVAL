@@ -20,7 +20,7 @@ const MULTIPLAYER_CONFIG = {
   
   // Leave empty to auto-detect based on current page:
   // NOTE: Using the Render multiplayer server for Code Red Survival
-  SERVER_URL: 'wss://multiplayer-for-code-red-survival.onrender.com', // Render server
+  SERVER_URL: 'wss://multiplayer-for-code-red.onrender.com', // Render server
   
   // ========================================
   // Optional: Game settings

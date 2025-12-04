@@ -5,7 +5,7 @@
 const config = typeof MULTIPLAYER_CONFIG !== 'undefined' ? MULTIPLAYER_CONFIG : {
   // Fallback config if not defined
   // NOTE: This should match your Render multiplayer server subdomain
-  SERVER_URL: 'wss://multiplayer-for-code-red-survival.onrender.com'
+  SERVER_URL: 'wss://multiplayer-for-code-red.onrender.com'
 };
 
 // Debug: Log what config we're using
