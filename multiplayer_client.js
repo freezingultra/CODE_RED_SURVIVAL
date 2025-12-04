@@ -197,7 +197,9 @@ class MultiplayerAPI {
 
   async createGame(playerName, mapSeed = null) {
     try {
-      const response = await fetch(`${this.baseUrl}/api/games/create`, {
+      console.log(`[MultiplayerAPI] Creating game at: ${this.baseUrl}/api/games`);
+      
+      const response = await fetch(`${this.baseUrl}/api/games`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -208,26 +210,36 @@ class MultiplayerAPI {
         })
       });
 
+      console.log(`[MultiplayerAPI] Response status: ${response.status}`);
+      console.log(`[MultiplayerAPI] Response headers:`, response.headers);
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create game');
+        const errorText = await response.text();
+        console.error(`[MultiplayerAPI] Error response: ${errorText}`);
+        throw new Error(`Server error: ${response.status} - ${errorText}`);
       }
 
-      const result = await response.json();
+      const responseText = await response.text();
+      console.log(`[MultiplayerAPI] Response text: ${responseText}`);
+      
+      if (!responseText) {
+        throw new Error('Server returned empty response. Is the multiplayer server running?');
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error(`[MultiplayerAPI] Failed to parse JSON: ${parseError}`);
+        throw new Error(`Invalid server response: ${responseText}`);
+      }
+
       return {
         code: result.code,
         mapSeed: result.mapSeed
       };
     } catch (error) {
       console.error('Failed to create game:', error);
-      // Provide more helpful error messages
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        // Prefer showing the WebSocket URL (wss://) if configured
-        const displayUrl = (config.SERVER_URL && config.SERVER_URL.trim() !== '')
-          ? config.SERVER_URL
-          : this.baseUrl;
-        throw new Error(`Cannot connect to multiplayer server at ${displayUrl}. Please check if the server is running and accessible.`);
-      }
       throw error;
     }
   }
