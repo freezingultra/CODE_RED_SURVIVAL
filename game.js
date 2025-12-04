@@ -1709,6 +1709,14 @@ findPathAStar(startX, startY, endX, endY) {
       this.gameCode = gameCode;
       this.isCreator = isCreator;
       
+      // Give starting loadout for multiplayer (Pistol + SMG)
+      this.player.weapons = [
+        { name: "Pistol", dmg: 18, bullets: 1, spread: 4, fireRate: 0.22, magSize: 12 },
+        { name: "SMG", dmg: 8, bullets: 1, spread: 6, fireRate: 0.08, magSize: Math.round(67 * 6.7) }
+      ];
+      this.player.weaponIndex = 0;
+      this.player.ammo = [12, Math.round(67 * 6.7)]; // Full ammo for both weapons
+      
       // Setup multiplayer event listeners
       this.multiplayerClient.on('joined', (data) => {
         this.player.color = data.playerColor;
@@ -3069,7 +3077,16 @@ findPathAStar(startX, startY, endX, endY) {
       const shopButton = document.getElementById("shopButton");
       if (shopButton) {
         shopButton.addEventListener("click", () => {
-          this.openShop();
+          // Check if we're in multiplayer mode
+          if (window.game && window.game.world && window.game.world.isMultiplayer) {
+            // Use multiplayer shop
+            if (window.multiplayerShop) {
+              window.multiplayerShop.showShop();
+            }
+          } else {
+            // Use regular shop
+            this.openShop();
+          }
         });
         shopButton.style.display = "none";
       }
@@ -3093,7 +3110,16 @@ findPathAStar(startX, startY, endX, endY) {
         
         if (pressedKey === controls.shop) {
           e.preventDefault();
-          this.openShop();
+          // Check if we're in multiplayer mode
+          if (window.game && window.game.world && window.game.world.isMultiplayer) {
+            // Use multiplayer shop
+            if (window.multiplayerShop) {
+              window.multiplayerShop.showShop();
+            }
+          } else {
+            // Use regular shop
+            this.openShop();
+          }
         }
         
         if (pressedKey === controls.switchWeapon) {
@@ -4184,8 +4210,22 @@ findPathAStar(startX, startY, endX, endY) {
             window.multiplayerMapSeed = mapSeed;
             window.multiplayerIsCreator = true;
 
-            // Start waiting for player
-            UI.waitForMultiplayerPlayer(gameCode, mapSeed);
+            // Update player list and show host controls
+            UI.updateLobbyPlayerList(result.players);
+            UI.showHostControls();
+
+            // Set up lobby event listeners
+            window.localLobby.on('playerJoined', () => {
+              const lobby = window.localLobby.getCurrentLobby();
+              UI.updateLobbyPlayerList(lobby.players);
+            });
+
+            window.localLobby.on('playerLeft', () => {
+              const lobby = window.localLobby.getCurrentLobby();
+              if (lobby) {
+                UI.updateLobbyPlayerList(lobby.players);
+              }
+            });
           } catch (error) {
             console.error("Failed to create game:", error);
             UI.showToast("Failed to create game. Check server connection.");
@@ -4219,8 +4259,31 @@ findPathAStar(startX, startY, endX, endY) {
             window.multiplayerMapSeed = mapSeed;
             window.multiplayerIsCreator = false;
 
-            // Start game immediately
-            UI.startMultiplayerGame(code, mapSeed, false);
+            // Show waiting panel with lobby
+            joinPanel.style.display = "none";
+            waitingPanel.style.display = "block";
+            document.getElementById("waitingCode").textContent = code;
+
+            // Update player list and show guest controls
+            UI.updateLobbyPlayerList(result.players);
+            UI.showGuestControls();
+
+            // Set up lobby event listeners
+            window.localLobby.on('playerJoined', () => {
+              const lobby = window.localLobby.getCurrentLobby();
+              UI.updateLobbyPlayerList(lobby.players);
+            });
+
+            window.localLobby.on('playerLeft', () => {
+              const lobby = window.localLobby.getCurrentLobby();
+              if (lobby) {
+                UI.updateLobbyPlayerList(lobby.players);
+              }
+            });
+
+            window.localLobby.on('gameStarted', () => {
+              UI.startMultiplayerGame(code, mapSeed, false);
+            });
           } catch (error) {
             console.error("Failed to join game:", error);
             UI.showToast("Game not found or is full!");
@@ -4302,6 +4365,62 @@ findPathAStar(startX, startY, endX, endY) {
         console.error("Failed to start multiplayer game:", error);
         UI.showToast("Failed to start multiplayer game!");
       }
+    },
+
+    updateLobbyPlayerList(players) {
+      const playersDiv = document.getElementById("players");
+      const playerCountSpan = document.getElementById("playerCount");
+      
+      if (!playersDiv || !playerCountSpan) return;
+      
+      playerCountSpan.textContent = players.length;
+      
+      playersDiv.innerHTML = players.map(player => `
+        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+          <div style="width: 12px; height: 12px; background: ${player.color}; border-radius: 50%; margin-right: 10px;"></div>
+          <span style="color: #fff; font-weight: ${player.isHost ? 'bold' : 'normal'};">
+            ${player.name} ${player.isHost ? '(Host)' : ''}
+          </span>
+        </div>
+      `).join('');
+    },
+
+    showHostControls() {
+      const hostControls = document.getElementById("hostControls");
+      const guestControls = document.getElementById("guestControls");
+      const startGameBtn = document.getElementById("startGameBtn");
+      
+      if (hostControls) hostControls.style.display = "block";
+      if (guestControls) guestControls.style.display = "none";
+      
+      if (startGameBtn) {
+        startGameBtn.onclick = async () => {
+          try {
+            const api = new MultiplayerAPI();
+            await api.startGame();
+            
+            // Start the multiplayer game
+            if (window.game && window.game.world) {
+              window.game.world.startMultiplayerGame(
+                window.multiplayerGameCode,
+                window.multiplayerMapSeed,
+                window.multiplayerIsCreator
+              );
+            }
+          } catch (error) {
+            console.error("Failed to start game:", error);
+            UI.showToast("Failed to start game");
+          }
+        };
+      }
+    },
+
+    showGuestControls() {
+      const hostControls = document.getElementById("hostControls");
+      const guestControls = document.getElementById("guestControls");
+      
+      if (hostControls) hostControls.style.display = "none";
+      if (guestControls) guestControls.style.display = "block";
     }
   };
 
