@@ -704,7 +704,7 @@
 
   // Player
   class Player {
-    constructor(x, y, isP1 = true) {
+    constructor(x, y) {
       this.x = x;
       this.y = y;
       this.radius = 12;
@@ -760,18 +760,14 @@
       this.pickupRadius = 1;
       this.rainbowCrystals = 0;
       const perm = PermanentUpgrades.load();
-      this.color = isP1 ? (perm.playerColor || "#00d9ff") : "#00ff88";
-      this.isP1 = isP1;
+      this.color = perm.playerColor || "#00d9ff";
       this.canShoot = true;
       this.magAmmo = this.weapons[0].magSize; // Initialize with first weapon's mag size
       this.reloadTimer = 0;
       this.railgunSpinAngle = 0;
       this.reloadKeyPressed = false; // Track if R key was pressed to prevent continuous reload
       
-      // Apply permanent upgrades if this is player 1
-      if (isP1) {
-        this.applyPermanentUpgrades();
-      }
+      this.applyPermanentUpgrades();
     }
 
     applyPermanentUpgrades() {
@@ -818,24 +814,17 @@
 
     update(dt, world) {
       let mx = 0, my = 0;
-      if (this.isP1) {
-        // Use virtual joystick on mobile, keyboard on desktop
-        if (Input.joystick.active) {
-          mx = Input.joystick.x;
-          my = Input.joystick.y;
-        } else {
-          const upgrades = PermanentUpgrades.load();
-          const controls = upgrades.controls || PermanentUpgrades.getDefaults().controls;
-          if (Input.keys[controls.moveUp]) my -= 1;
-          if (Input.keys[controls.moveDown]) my += 1;
-          if (Input.keys[controls.moveLeft]) mx -= 1;
-          if (Input.keys[controls.moveRight]) mx += 1;
-        }
+      // Use virtual joystick on mobile, keyboard on desktop
+      if (Input.joystick.active) {
+        mx = Input.joystick.x;
+        my = Input.joystick.y;
       } else {
-        if (Input.keys['arrowup']) my -= 1;
-        if (Input.keys['arrowdown']) my += 1;
-        if (Input.keys['arrowleft']) mx -= 1;
-        if (Input.keys['arrowright']) mx += 1;
+        const upgrades = PermanentUpgrades.load();
+        const controls = upgrades.controls || PermanentUpgrades.getDefaults().controls;
+        if (Input.keys[controls.moveUp]) my -= 1;
+        if (Input.keys[controls.moveDown]) my += 1;
+        if (Input.keys[controls.moveLeft]) mx -= 1;
+        if (Input.keys[controls.moveRight]) mx += 1;
       }
 
       const len = Math.hypot(mx, my);
@@ -938,14 +927,7 @@
       }
       
       this.shootCooldown = weapon.fireRate;
-      let angle;
-      if (world.isMultiplayer) {
-        const cam = this.isP1 ? world.camera1 : world.camera2;
-        const mouseY = this.isP1 ? Input.mouse.y : Input.mouse.y - world.canvas.height / 2;
-        angle = Math.atan2(mouseY + cam.y - this.y, Input.mouse.x + cam.x - this.x);
-      } else {
-        angle = Math.atan2(Input.mouse.y + world.camera.y - this.y, Input.mouse.x + world.camera.x - this.x);
-      }
+      const angle = Math.atan2(Input.mouse.y + world.camera.y - this.y, Input.mouse.x + world.camera.x - this.x);
 
       for (let i = 0; i < weapon.bullets; i++) {
         const spread = (Math.random() - 0.5) * (weapon.spread * Math.PI / 180);
@@ -1331,24 +1313,19 @@
       
       this.generateMaze();
       
-      this.player = new Player(this.mapW * this.tileSize / 2, this.mapH * this.tileSize / 2, true);
-      this.player2 = null;
+      this.player = new Player(this.mapW * this.tileSize / 2, this.mapH * this.tileSize / 2);
       this.enemies = [];
       this.bullets = [];
       this.loots = [];
       this.particles = [];
       this.wave = 0;
       this.isRunning = false;
-      this.isMultiplayer = false;
       this.isLoggedIn = !!localStorage.getItem("codered-user");
       this.userName = localStorage.getItem("codered-user") || "Guest";
       this.totalPlayTime = 0;
-      this.winner = "";
       this.paused = false;
       this.cheatsUsed = false;
       this.camera = { x: 0, y: 0, w: canvas.width, h: canvas.height };
-      this.camera1 = { x: 0, y: 0, w: canvas.width, h: canvas.height / 2 };
-      this.camera2 = { x: 0, y: 0, w: canvas.width, h: canvas.height / 2 };
       this.spawnTimer = 0;
       this.waveTimer = 0;
       this.waveTimeLimit = 120;
@@ -1671,166 +1648,6 @@ findPathAStar(startX, startY, endX, endY) {
       }
     }
 
-    startMultiplayer() {
-      this.isMultiplayer = true;
-      this.isRunning = true;
-      this.spawnTimer = 0;
-      this.waveTimer = 0;
-      this.waveTimeLimit = 300;
-      this.player.hp = this.player.maxHp;
-      this.player.color = "#00d9ff";
-      this.player.weaponIndex = 2;
-      this.player.weapons[2].magSize = 1;
-      this.player.weapons[2].reloadTime = 15;
-      this.player.magAmmo = 1;
-      this.player.reloadTimer = 0;
-      this.player2 = new Player(this.mapW * this.tileSize / 2 + randRange(200, 500), this.mapH * this.tileSize / 2 + randRange(200, 500), false);
-      this.player2.hp = this.player2.maxHp;
-      this.player2.color = "#00ff88";
-      this.player2.canShoot = false;
-      this.enemies = [];
-      this.bullets = [];
-      this.loots = [];
-      Log.info("Multiplayer started! P1 hunt P2 for 5 min");
-      UI.showToast("Multiplayer: P1 hunt P2!");
-    }
-
-    startMultiplayerGame(gameCode, mapSeed, isCreator) {
-      // Use the provided map seed for consistent map generation
-      this.mapSeed = mapSeed;
-      
-      // Regenerate maze with seed for consistency
-      this.generateMazeWithSeed(mapSeed);
-      
-      // Initialize multiplayer client
-      this.multiplayerClient = new MultiplayerClient();
-      this.isMultiplayer = true;
-      this.isGlobalMultiplayer = true;
-      this.gameCode = gameCode;
-      this.isCreator = isCreator;
-      
-      // Give starting loadout for multiplayer (Pistol + SMG)
-      this.player.weapons = [
-        { name: "Pistol", dmg: 18, bullets: 1, spread: 4, fireRate: 0.22, magSize: 12 },
-        { name: "SMG", dmg: 8, bullets: 1, spread: 6, fireRate: 0.08, magSize: Math.round(67 * 6.7) }
-      ];
-      this.player.weaponIndex = 0;
-      this.player.ammo = [12, Math.round(67 * 6.7)]; // Full ammo for both weapons
-      
-      // Setup multiplayer event listeners
-      this.multiplayerClient.on('joined', (data) => {
-        this.player.color = data.playerColor;
-        Log.info("Joined multiplayer game: " + gameCode);
-        UI.showToast("Connected to multiplayer game!");
-        this.startWave();
-      });
-
-      this.multiplayerClient.on('player_joined', (data) => {
-        Log.info("Player joined: " + data.playerName);
-        UI.showToast(data.playerName + " joined the game!");
-      });
-
-      this.multiplayerClient.on('player_update', (data) => {
-        if (this.player2) {
-          this.player2.x = data.x;
-          this.player2.y = data.y;
-          this.player2.hp = data.hp;
-          this.player2.weaponIndex = data.weaponIndex;
-        }
-      });
-
-      this.multiplayerClient.on('player_left', () => {
-        Log.info("Other player disconnected");
-        UI.showToast("Other player disconnected!");
-        this.gameOver();
-      });
-
-      this.multiplayerClient.on('disconnected', () => {
-        Log.info("Disconnected from multiplayer server");
-        if (this.isRunning) {
-          UI.showToast("Connection lost!");
-          this.gameOver();
-        }
-      });
-
-      this.multiplayerClient.on('error', (data) => {
-        Log.error("Multiplayer error:", data);
-        UI.showToast("Multiplayer error: " + data.message);
-      });
-
-      // Connect to server (uses configured Render URL from multiplayer_client.js)
-      this.multiplayerClient.connect(gameCode, this.userName).then(() => {
-        Log.info("Multiplayer connection established");
-        
-        // Initialize player2 (remote player)
-        this.player2 = new Player(
-          this.mapW * this.tileSize / 2 + randRange(200, 500),
-          this.mapH * this.tileSize / 2 + randRange(200, 500),
-          false
-        );
-        this.player2.color = this.multiplayerClient.playerColor === "#00d9ff" ? "#00ff88" : "#00d9ff";
-        
-        this.isRunning = true;
-        this.startWave();
-      }).catch(error => {
-        Log.error("Failed to connect to multiplayer:", error);
-        UI.showToast("Failed to connect to multiplayer server!");
-      });
-    }
-
-    generateMazeWithSeed(seed) {
-      // Use seed to generate deterministic maze
-      const seededRandom = (s) => {
-        const x = Math.sin(s) * 10000;
-        return x - Math.floor(x);
-      };
-
-      this.map.fill(1);
-      const roomSize = 8, corridorWidth = 3;
-      
-      for (let ry = 0; ry < Math.floor(this.mapH / roomSize); ry++) {
-        for (let rx = 0; rx < Math.floor(this.mapW / roomSize); rx++) {
-          const roomX = rx * roomSize, roomY = ry * roomSize;
-          for (let y = 1; y < roomSize - 1; y++) {
-            for (let x = 1; x < roomSize - 1; x++) {
-              const mx = roomX + x, my = roomY + y;
-              if (mx > 0 && my > 0 && mx < this.mapW - 1 && my < this.mapH - 1) {
-                this.map[my * this.mapW + mx] = 0;
-              }
-            }
-          }
-          if (rx < Math.floor(this.mapW / roomSize) - 1 && seededRandom(seed + rx + ry * 100) > 0.3) {
-            for (let x = roomSize - 1; x < roomSize + corridorWidth; x++) {
-              for (let y = Math.floor(roomSize / 3); y < Math.floor(roomSize * 2 / 3); y++) {
-                const mx = roomX + x, my = roomY + y;
-                if (mx > 0 && my > 0 && mx < this.mapW - 1 && my < this.mapH - 1) {
-                  this.map[my * this.mapW + mx] = 0;
-                }
-              }
-            }
-          }
-          if (ry < Math.floor(this.mapH / roomSize) - 1 && seededRandom(seed + rx * 100 + ry) > 0.3) {
-            for (let y = roomSize - 1; y < roomSize + corridorWidth; y++) {
-              for (let x = Math.floor(roomSize / 3); x < Math.floor(roomSize * 2 / 3); x++) {
-                const mx = roomX + x, my = roomY + y;
-                if (mx > 0 && my > 0 && mx < this.mapW - 1 && my < this.mapH - 1) {
-                  this.map[my * this.mapW + mx] = 0;
-                }
-              }
-            }
-          }
-        }
-      }
-      
-      const cx = Math.floor(this.mapW / 2), cy = Math.floor(this.mapH / 2);
-      for (let yy = -6; yy <= 6; yy++) {
-        for (let xx = -6; xx <= 6; xx++) {
-          const idx = (cy + yy) * this.mapW + (cx + xx);
-          if (idx >= 0 && idx < this.map.length) this.map[idx] = 0;
-        }
-      }
-    }
-
     async gameOver() {
       if (this.isRunning === false && this.paused === true) {
         return; // Already called gameOver, prevent duplicate
@@ -1844,30 +1661,26 @@ findPathAStar(startX, startY, endX, endY) {
       upgrades.rainbowCrystals = (upgrades.rainbowCrystals || 0) + (this.player.rainbowCrystals || 0);
       PermanentUpgrades.save(upgrades);
       
-      if (this.isMultiplayer) {
-        UI.showGameOver(this.winner + " Wins!", 0, 0);
-      } else {
-        const sd = Save.load();
-        sd.coins += Math.floor(this.player.coins);
-        if (this.wave > sd.bestWave) sd.bestWave = this.wave;
-        Save.save(sd);
-        
-        if (!this.cheatsUsed) {
-          await Leaderboard.addScore(this.userName, this.wave, this.difficulty, this.player.kills);
-          if (this.player && this.player.hp <= 0) {
-            UI.showGameOver("YOU DIED!", this.player.kills, Math.floor(this.player.coins));
-          } else {
-            UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
-          }
+      const sd = Save.load();
+      sd.coins += Math.floor(this.player.coins);
+      if (this.wave > sd.bestWave) sd.bestWave = this.wave;
+      Save.save(sd);
+      
+      if (!this.cheatsUsed) {
+        await Leaderboard.addScore(this.userName, this.wave, this.difficulty, this.player.kills);
+        if (this.player && this.player.hp <= 0) {
+          UI.showGameOver("YOU DIED!", this.player.kills, Math.floor(this.player.coins));
         } else {
-          if (this.player && this.player.hp <= 0) {
-            UI.showGameOver("YOU DIED!", this.player.kills, Math.floor(this.player.coins));
-          } else {
-            UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
-          }
-          UI.showToast("⚠️ Cheats Used - Score Not Submitted to Leaderboard");
-          Log.warn("Score not submitted - cheats were used");
+          UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
         }
+      } else {
+        if (this.player && this.player.hp <= 0) {
+          UI.showGameOver("YOU DIED!", this.player.kills, Math.floor(this.player.coins));
+        } else {
+          UI.showGameOver(this.wave, this.player.kills, Math.floor(this.player.coins));
+        }
+        UI.showToast("⚠️ Cheats Used - Score Not Submitted to Leaderboard");
+        Log.warn("Score not submitted - cheats were used");
       }
     }
 
@@ -1899,147 +1712,10 @@ findPathAStar(startX, startY, endX, endY) {
         }
       }
       
-      if (!this.isRunning && !this.isMultiplayer && Input.keys[' ']) {
+      if (!this.isRunning && Input.keys[' ']) {
         this.startWave();
       }
-      
-      if (this.isMultiplayer) {
-        this.player.update(dt, this);
-        this.player2.update(dt, this);
-        
-        this.waveTimer += dt;
-        if (this.waveTimer >= this.waveTimeLimit) {
-          this.winner = "Player 2";
-          this.gameOver();
-          return;
-        }
-        
-        this.spawnTimer += dt;
-        if (this.spawnTimer >= 10) {
-          this.spawnTimer = 0;
-          
-          if (this.enemies.length < CONFIG.maxEnemies) {
-            let x, y;
-            let attempts = 0;
-            do {
-              x = randRange(32, this.mapW * this.tileSize - 32);
-              y = randRange(32, this.mapH * this.tileSize - 32);
-              attempts++;
-            } while (this.checkCollision(x, y, 7) && attempts < 20);
-            if (attempts < 20) {
-              this.loots.push({
-                x: x,
-                y: y,
-                type: "health",
-                value: 50,
-                radius: 7,
-                    age: 0,
-                    lifetime: 30,
-                    pickupDelay: 0.12
-              });
-            }
-          }
-        }
-        
-        for (let i = this.bullets.length - 1; i >= 0; i--) {
-          const b = this.bullets[i];
-          b.x += b.vx * dt;
-          b.y += b.vy * dt;
-          b.travel += Math.hypot(b.vx * dt, b.vy * dt);
-          
-          if (b.travel > b.maxTravel || this.checkCollision(b.x, b.y, b.radius)) {
-            this.bullets.splice(i, 1);
-            continue;
-          }
-          
-          const collisionDist = (b.radius + this.player2.radius) * (b.radius + this.player2.radius);
-          if (dist2(b.x, b.y, this.player2.x, this.player2.y) < collisionDist) {
-            const dmg = b.dmg * (1 - (this.player2.armor || 0));
-            this.player2.hp -= dmg;
-            Log.info("P2 HIT! Took " + Math.round(dmg) + " damage. HP: " + Math.round(this.player2.hp));
-            this.bullets.splice(i, 1);
-            this.spawnParticles(this.player2.x, this.player2.y, 10, "#ffaaaa");
-            sfxHit();
-            if (this.player2.hp <= 0) {
-              this.winner = "Player 1";
-              this.gameOver();
-            }
-          }
-        }
-        
-        if (this.bullets.length > CONFIG.maxBullets) {
-          this.bullets.splice(0, this.bullets.length - CONFIG.maxBullets);
-          Log.warn("Bullet limit reached, removing oldest bullets");
-        }
-        
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-          const p = this.particles[i];
-          p.age += dt;
-          if (p.age >= p.life) {
-            this.particles.splice(i, 1);
-            continue;
-          }
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          p.vy += 100 * dt;
-        }
-        
-        if (this.particles.length > CONFIG.maxParticles) {
-          this.particles.splice(0, this.particles.length - CONFIG.maxParticles);
-        }
-        
-        for (let i = this.loots.length - 1; i >= 0; i--) {
-          const l = this.loots[i];
-          l.age += dt;
-          if (l.age >= l.lifetime) {
-            this.loots.splice(i, 1);
-            continue;
-          }
-          
-          const pickupRadius1 = l.radius + this.player.radius + (12 * (this.player.pickupRadius || 1));
-          const pickupDistSq1 = pickupRadius1 * pickupRadius1;
-          if (dist2(l.x, l.y, this.player.x, this.player.y) < pickupDistSq1) {
-            if (l.type === "health") {
-              this.player.hp = Math.min(this.player.maxHp, this.player.hp + l.value);
-            } else if (l.type === "coin") {
-              this.player.coins += l.value;
-            } else if (l.type === "gem") {
-              this.player.gems += l.value;
-            }
-            this.loots.splice(i, 1);
-            sfxPickup();
-            continue;
-          }
-          
-          const pickupRadius2 = l.radius + this.player2.radius + (12 * (this.player2.pickupRadius || 1));
-          const pickupDistSq2 = pickupRadius2 * pickupRadius2;
-          if (dist2(l.x, l.y, this.player2.x, this.player2.y) < pickupDistSq2) {
-            if (l.type === "health") {
-              this.player2.hp = Math.min(this.player2.maxHp, this.player2.hp + l.value);
-            } else if (l.type === "coin") {
-              this.player2.coins += l.value;
-            } else if (l.type === "gem") {
-              this.player2.gems += l.value;
-            }
-            this.loots.splice(i, 1);
-            sfxPickup();
-          }
-        }
-        
-        const targetX1 = clamp(this.player.x - this.camera1.w / 2, 0, this.mapW * this.tileSize - this.camera1.w);
-        const targetY1 = clamp(this.player.y - this.camera1.h / 2, 0, this.mapH * this.tileSize - this.camera1.h);
-        this.camera1.x += (targetX1 - this.camera1.x) * 0.1;
-        this.camera1.y += (targetY1 - this.camera1.y) * 0.1;
-        
-        const targetX2 = clamp(this.player2.x - this.camera2.w / 2, 0, this.mapW * this.tileSize - this.camera2.w);
-        const targetY2 = clamp(this.player2.y - this.camera2.h / 2, 0, this.mapH * this.tileSize - this.camera2.h);
-        this.camera2.x += (targetX2 - this.camera2.x) * 0.1;
-        this.camera2.y += (targetY2 - this.camera2.y) * 0.1;
-        
-        UI.updateHUD(this);
-        return;
-      }
-      
+
       if (this.isRunning) {
         this.waveTimer += dt;
         
@@ -2332,8 +2008,6 @@ findPathAStar(startX, startY, endX, endY) {
     }
     
     updateHTMLHUD() {
-      if (this.isMultiplayer) return;
-      
       try {
         if (document.getElementById('waveNumber')) {
           document.getElementById('waveNumber').textContent = this.wave;
@@ -2379,102 +2053,65 @@ findPathAStar(startX, startY, endX, endY) {
       ctx.fillStyle = "#0a0a0a";
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       
-      if (this.isMultiplayer) {
-        const h = this.canvas.height / 2;
-        const w = this.canvas.width;
-        
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, 0, w, h);
-        ctx.clip();
-        ctx.translate(-this.camera1.x, -this.camera1.y);
-        this.drawWorld(ctx);
-        ctx.restore();
-        
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, h, w, h);
-        ctx.clip();
-        ctx.translate(0, h);
-        ctx.translate(-this.camera2.x, -this.camera2.y);
-        this.drawWorld(ctx);
-        ctx.restore();
-        
-        ctx.fillStyle = "white";
-        ctx.font = "20px monospace";
-        ctx.fillText("P1 HP: " + Math.round(this.player.hp), 10, 30);
-        ctx.fillText("P2 HP: " + Math.round(this.player2.hp), 10, 60);
+      ctx.save();
+      ctx.translate(-this.camera.x, -this.camera.y);
+      this.drawWorld(ctx);
+      ctx.restore();
+      
+      ctx.fillStyle = "white";
+      ctx.font = "bold 18px monospace";
+      
+      ctx.save();
+      
+      ctx.fillStyle = 'rgba(20, 20, 30, 0.85)';
+      ctx.strokeStyle = '#00d9ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(20, 20, 220, 100, 10);
+      ctx.fill();
+      ctx.stroke();
+      
+      ctx.font = 'bold 16px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#ffffff';
+      
+      const hpPercent = this.player.hp / this.player.maxHp;
+      const hpColor = hpPercent > 0.6 ? '#00ff88' : hpPercent > 0.3 ? '#ffaa00' : '#ff3366';
+      ctx.fillText('HEALTH:', 40, 45);
+      ctx.fillStyle = hpColor;
+      ctx.fillText(`${Math.round(this.player.hp)}/${this.player.maxHp}`, 120, 45);
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('COINS:', 40, 70);
+      ctx.fillStyle = '#ffdd00';
+      ctx.fillText(Math.floor(this.player.coins), 120, 70);
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('KILLS:', 40, 95);
+      ctx.fillStyle = '#00d9ff';
+      ctx.fillText(this.player.kills, 120, 95);
+      
+      ctx.restore();
+      
+      ctx.save();
+      ctx.font = 'bold 22px "Segoe UI", sans-serif';
+      ctx.fillStyle = 'rgba(0, 217, 255, 0.9)';
+      ctx.textAlign = 'center';
+      
+      if (this.isRunning) {
         const timeLeft = this.waveTimeLimit - this.waveTimer;
         const mins = Math.floor(timeLeft / 60);
         const secs = Math.floor(timeLeft % 60).toString().padStart(2, '0');
-        ctx.fillText("Time: " + mins + ":" + secs, w / 2 - 50, 30);
-        ctx.fillText("Players: " + PlayerCounter.getCount(), w - 150, 30);
-        
-        ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-        ctx.font = "14px monospace";
-        ctx.fillText("v1.0.70", w - 60, this.canvas.height - 10);
+        ctx.fillText(`WAVE ${this.wave} - ${mins}:${secs}`, this.canvas.width/2, 40);
       } else {
-        ctx.save();
-        ctx.translate(-this.camera.x, -this.camera.y);
-        this.drawWorld(ctx);
-        ctx.restore();
-        
-        ctx.fillStyle = "white";
-        ctx.font = "bold 18px monospace";
-        
-        ctx.save();
-        
-        ctx.fillStyle = 'rgba(20, 20, 30, 0.85)';
-        ctx.strokeStyle = '#00d9ff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(20, 20, 220, 100, 10);
-        ctx.fill();
-        ctx.stroke();
-        
-        ctx.font = 'bold 16px "Segoe UI", sans-serif';
-        ctx.fillStyle = '#ffffff';
-        
-        const hpPercent = this.player.hp / this.player.maxHp;
-        const hpColor = hpPercent > 0.6 ? '#00ff88' : hpPercent > 0.3 ? '#ffaa00' : '#ff3366';
-        ctx.fillText('HEALTH:', 40, 45);
-        ctx.fillStyle = hpColor;
-        ctx.fillText(`${Math.round(this.player.hp)}/${this.player.maxHp}`, 120, 45);
-        
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText('COINS:', 40, 70);
-        ctx.fillStyle = '#ffdd00';
-        ctx.fillText(Math.floor(this.player.coins), 120, 70);
-        
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText('KILLS:', 40, 95);
-        ctx.fillStyle = '#00d9ff';
-        ctx.fillText(this.player.kills, 120, 95);
-        
-        ctx.restore();
-        
-        ctx.save();
-        ctx.font = 'bold 22px "Segoe UI", sans-serif';
-        ctx.fillStyle = 'rgba(0, 217, 255, 0.9)';
-        ctx.textAlign = 'center';
-        
-        if (this.isRunning) {
-          const timeLeft = this.waveTimeLimit - this.waveTimer;
-          const mins = Math.floor(timeLeft / 60);
-          const secs = Math.floor(timeLeft % 60).toString().padStart(2, '0');
-          ctx.fillText(`WAVE ${this.wave} - ${mins}:${secs}`, this.canvas.width/2, 40);
-        } else {
-          ctx.fillText(`PRESS SPACE TO START WAVE ${this.wave + 1}`, this.canvas.width/2, 40);
-        }
-        
-        ctx.restore();
+        ctx.fillText(`PRESS SPACE TO START WAVE ${this.wave + 1}`, this.canvas.width/2, 40);
       }
       
+      ctx.restore();
       this.drawMinimap(ctx);
     }
 
     drawWorld(ctx) {
-      const cam = this.isMultiplayer ? (ctx.getTransform().f === 0 ? this.camera1 : this.camera2) : this.camera;
+      const cam = this.camera;
       const startX = Math.max(0, Math.floor(cam.x / this.tileSize) - 1);
       const endX = Math.min(this.mapW, Math.ceil((cam.x + cam.w) / this.tileSize) + 1);
       const startY = Math.max(0, Math.floor(cam.y / this.tileSize) - 1);
@@ -2568,7 +2205,6 @@ findPathAStar(startX, startY, endX, endY) {
       for (const e of this.enemies) e.draw(ctx);
       
       this.player.draw(ctx);
-      if (this.player2) this.player2.draw(ctx);
       
       for (const p of this.particles) {
         const t = 1 - (p.age / p.life);
@@ -2582,8 +2218,6 @@ findPathAStar(startX, startY, endX, endY) {
     }
 
     drawMinimap(ctx) {
-      if (this.isMultiplayer) return;
-      
       const size = 180, pad = 12;
       const x = this.canvas.width - size - pad;
       const y = this.canvas.height - size - pad;
@@ -2664,32 +2298,9 @@ findPathAStar(startX, startY, endX, endY) {
         ,
         customizeScreen: document.getElementById("customizeScreen"),
         controlsScreen: document.getElementById("controlsScreen"),
-        promoScreen: document.getElementById("promoScreen"),
-        multiplayerScreen: document.getElementById("multiplayerScreen")
+        promoScreen: document.getElementById("promoScreen")
       };
-      
-      const multiplayerBtn = document.getElementById("multiplayerBtn");
-      if (multiplayerBtn) {
-        multiplayerBtn.addEventListener("click", () => {
-          console.log("[Multiplayer] Button clicked");
-          this.elements.homeScreen.style.display = "none";
-          
-          // Fetch multiplayerScreen if not already cached
-          if (!this.elements.multiplayerScreen) {
-            this.elements.multiplayerScreen = document.getElementById("multiplayerScreen");
-            console.log("[Multiplayer] Fetched multiplayerScreen from DOM:", this.elements.multiplayerScreen ? "found" : "not found");
-          }
-          
-          if (this.elements.multiplayerScreen) {
-            console.log("[Multiplayer] Showing multiplayer screen");
-            this.elements.multiplayerScreen.style.display = "flex";
-            this.setupMultiplayerUI();
-          } else {
-            console.error("[Multiplayer] multiplayerScreen element not found in DOM!");
-          }
-        });
-      }
-      
+
       const customizeBtn = document.getElementById("customizeBtn");
       if (customizeBtn) {
         customizeBtn.addEventListener("click", () => {
@@ -3077,16 +2688,7 @@ findPathAStar(startX, startY, endX, endY) {
       const shopButton = document.getElementById("shopButton");
       if (shopButton) {
         shopButton.addEventListener("click", () => {
-          // Check if we're in multiplayer mode
-          if (window.game && window.game.world && window.game.world.isMultiplayer) {
-            // Use multiplayer shop
-            if (window.multiplayerShop) {
-              window.multiplayerShop.showShop();
-            }
-          } else {
-            // Use regular shop
-            this.openShop();
-          }
+          this.openShop();
         });
         shopButton.style.display = "none";
       }
@@ -3110,16 +2712,7 @@ findPathAStar(startX, startY, endX, endY) {
         
         if (pressedKey === controls.shop) {
           e.preventDefault();
-          // Check if we're in multiplayer mode
-          if (window.game && window.game.world && window.game.world.isMultiplayer) {
-            // Use multiplayer shop
-            if (window.multiplayerShop) {
-              window.multiplayerShop.showShop();
-            }
-          } else {
-            // Use regular shop
-            this.openShop();
-          }
+          this.openShop();
         }
         
         if (pressedKey === controls.switchWeapon) {
@@ -3158,11 +2751,7 @@ findPathAStar(startX, startY, endX, endY) {
     
     updateHUD(world) {
       if (!world.player) return;
-      
-      if (world.isMultiplayer) {
-        return;
-      }
-      
+
       this.elements.healthBar.style.width = Math.max(0, (world.player.hp / world.player.maxHp) * 100) + "%";
       this.elements.coinCount.textContent = Math.floor(world.player.coins);
       this.elements.gemCount.textContent = Math.floor(world.player.gems);
@@ -4153,274 +3742,6 @@ findPathAStar(startX, startY, endX, endY) {
       toast.textContent = msg;
       toast.classList.add("show");
       setTimeout(() => toast.classList.remove("show"), 2200);
-    },
-
-    setupMultiplayerUI() {
-      const createBtn = document.getElementById("createGameBtn");
-      const joinBtn = document.getElementById("joinGameBtn");
-      const confirmCreateBtn = document.getElementById("confirmCreateBtn");
-      const confirmJoinBtn = document.getElementById("confirmJoinBtn");
-      const cancelWaitBtn = document.getElementById("cancelWaitBtn");
-      const multiplayerCloseBtn = document.getElementById("multiplayerCloseBtn");
-
-      const createPanel = document.getElementById("createGamePanel");
-      const joinPanel = document.getElementById("joinGamePanel");
-      const waitingPanel = document.getElementById("waitingPanel");
-
-      // Create Game button
-      if (createBtn) {
-        createBtn.onclick = () => {
-          createPanel.style.display = "block";
-          joinPanel.style.display = "none";
-          waitingPanel.style.display = "none";
-        };
-      }
-
-      // Join Game button
-      if (joinBtn) {
-        joinBtn.onclick = () => {
-          createPanel.style.display = "none";
-          joinPanel.style.display = "block";
-          waitingPanel.style.display = "none";
-          document.getElementById("joinCodeInput").focus();
-        };
-      }
-
-      // Confirm Create button
-      if (confirmCreateBtn) {
-        confirmCreateBtn.onclick = async () => {
-          try {
-            confirmCreateBtn.disabled = true;
-            confirmCreateBtn.textContent = "Creating...";
-
-            const api = new MultiplayerAPI();
-            const result = await api.createGame(window.game.world.userName, Math.random());
-
-            const gameCode = result.code;
-            const mapSeed = result.mapSeed;
-
-            // Show waiting panel
-            createPanel.style.display = "none";
-            waitingPanel.style.display = "block";
-            document.getElementById("gameCode").textContent = gameCode;
-            document.getElementById("waitingCode").textContent = gameCode;
-
-            // Store for later use
-            window.multiplayerGameCode = gameCode;
-            window.multiplayerMapSeed = mapSeed;
-            window.multiplayerIsCreator = true;
-
-            // Update player list and show host controls
-            UI.updateLobbyPlayerList(result.players);
-            UI.showHostControls();
-
-            // Set up lobby event listeners
-            window.localLobby.on('playerJoined', () => {
-              const lobby = window.localLobby.getCurrentLobby();
-              UI.updateLobbyPlayerList(lobby.players);
-            });
-
-            window.localLobby.on('playerLeft', () => {
-              const lobby = window.localLobby.getCurrentLobby();
-              if (lobby) {
-                UI.updateLobbyPlayerList(lobby.players);
-              }
-            });
-          } catch (error) {
-            console.error("Failed to create game:", error);
-            UI.showToast("Failed to create game. Check server connection.");
-            confirmCreateBtn.disabled = false;
-            confirmCreateBtn.textContent = "✨ Create & Start Waiting";
-          }
-        };
-      }
-
-      // Confirm Join button
-      if (confirmJoinBtn) {
-        confirmJoinBtn.onclick = async () => {
-          const code = document.getElementById("joinCodeInput").value.toUpperCase();
-
-          if (!code || code.length !== 4) {
-            UI.showToast("Enter a valid 4-letter code!");
-            return;
-          }
-
-          try {
-            confirmJoinBtn.disabled = true;
-            confirmJoinBtn.textContent = "Joining...";
-
-            const api = new MultiplayerAPI();
-            const result = await api.joinGame(code, window.game.world.userName);
-
-            const mapSeed = result.mapSeed;
-
-            // Store for later use
-            window.multiplayerGameCode = code;
-            window.multiplayerMapSeed = mapSeed;
-            window.multiplayerIsCreator = false;
-
-            // Show waiting panel with lobby
-            joinPanel.style.display = "none";
-            waitingPanel.style.display = "block";
-            document.getElementById("waitingCode").textContent = code;
-
-            // Update player list and show guest controls
-            UI.updateLobbyPlayerList(result.players);
-            UI.showGuestControls();
-
-            // Set up lobby event listeners
-            window.localLobby.on('playerJoined', () => {
-              const lobby = window.localLobby.getCurrentLobby();
-              UI.updateLobbyPlayerList(lobby.players);
-            });
-
-            window.localLobby.on('playerLeft', () => {
-              const lobby = window.localLobby.getCurrentLobby();
-              if (lobby) {
-                UI.updateLobbyPlayerList(lobby.players);
-              }
-            });
-
-            window.localLobby.on('gameStarted', () => {
-              UI.startMultiplayerGame(code, mapSeed, false);
-            });
-          } catch (error) {
-            console.error("Failed to join game:", error);
-            UI.showToast("Game not found or is full!");
-            confirmJoinBtn.disabled = false;
-            confirmJoinBtn.textContent = "🎮 Join Game";
-          }
-        };
-      }
-
-      // Cancel Wait button
-      if (cancelWaitBtn) {
-        cancelWaitBtn.onclick = () => {
-          window.multiplayerGameCode = null;
-          window.multiplayerMapSeed = null;
-          createPanel.style.display = "none";
-          joinPanel.style.display = "none";
-          waitingPanel.style.display = "none";
-          this.elements.multiplayerScreen.style.display = "none";
-          this.elements.homeScreen.style.display = "flex";
-        };
-      }
-
-      // Close button
-      if (multiplayerCloseBtn) {
-        multiplayerCloseBtn.onclick = () => {
-          window.multiplayerGameCode = null;
-          window.multiplayerMapSeed = null;
-          createPanel.style.display = "none";
-          joinPanel.style.display = "none";
-          waitingPanel.style.display = "none";
-          this.elements.multiplayerScreen.style.display = "none";
-          this.elements.homeScreen.style.display = "flex";
-        };
-      }
-    },
-
-    async waitForMultiplayerPlayer(gameCode, mapSeed) {
-      const api = new MultiplayerAPI();
-      let checkCount = 0;
-      const maxChecks = 120; // 2 minutes max wait
-
-      const checkInterval = setInterval(async () => {
-        checkCount++;
-
-        try {
-          const info = await api.getGameInfo(gameCode);
-
-          if (info.playerCount >= 2) {
-            clearInterval(checkInterval);
-            UI.startMultiplayerGame(gameCode, mapSeed, true);
-          } else if (checkCount >= maxChecks) {
-            clearInterval(checkInterval);
-            UI.showToast("Waiting timeout. Returning to menu.");
-            setTimeout(() => {
-              document.getElementById("createGamePanel").style.display = "none";
-              document.getElementById("waitingPanel").style.display = "none";
-              this.elements.multiplayerScreen.style.display = "none";
-              this.elements.homeScreen.style.display = "flex";
-            }, 1000);
-          }
-        } catch (error) {
-          console.error("Error checking game status:", error);
-        }
-      }, 1000);
-    },
-
-    async startMultiplayerGame(gameCode, mapSeed, isCreator) {
-      try {
-        // Hide UI
-        this.hideAll();
-        const shopBtn = document.getElementById("shopButton");
-        if (shopBtn) shopBtn.style.display = "block";
-
-        // Start the game with multiplayer
-        if (window.game && window.game.world) {
-          window.game.world.startMultiplayerGame(gameCode, mapSeed, isCreator);
-        }
-      } catch (error) {
-        console.error("Failed to start multiplayer game:", error);
-        UI.showToast("Failed to start multiplayer game!");
-      }
-    },
-
-    updateLobbyPlayerList(players) {
-      const playersDiv = document.getElementById("players");
-      const playerCountSpan = document.getElementById("playerCount");
-      
-      if (!playersDiv || !playerCountSpan) return;
-      
-      playerCountSpan.textContent = players.length;
-      
-      playersDiv.innerHTML = players.map(player => `
-        <div style="display: flex; align-items: center; margin-bottom: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px;">
-          <div style="width: 12px; height: 12px; background: ${player.color}; border-radius: 50%; margin-right: 10px;"></div>
-          <span style="color: #fff; font-weight: ${player.isHost ? 'bold' : 'normal'};">
-            ${player.name} ${player.isHost ? '(Host)' : ''}
-          </span>
-        </div>
-      `).join('');
-    },
-
-    showHostControls() {
-      const hostControls = document.getElementById("hostControls");
-      const guestControls = document.getElementById("guestControls");
-      const startGameBtn = document.getElementById("startGameBtn");
-      
-      if (hostControls) hostControls.style.display = "block";
-      if (guestControls) guestControls.style.display = "none";
-      
-      if (startGameBtn) {
-        startGameBtn.onclick = async () => {
-          try {
-            const api = new MultiplayerAPI();
-            await api.startGame();
-            
-            // Start the multiplayer game
-            if (window.game && window.game.world) {
-              window.game.world.startMultiplayerGame(
-                window.multiplayerGameCode,
-                window.multiplayerMapSeed,
-                window.multiplayerIsCreator
-              );
-            }
-          } catch (error) {
-            console.error("Failed to start game:", error);
-            UI.showToast("Failed to start game");
-          }
-        };
-      }
-    },
-
-    showGuestControls() {
-      const hostControls = document.getElementById("hostControls");
-      const guestControls = document.getElementById("guestControls");
-      
-      if (hostControls) hostControls.style.display = "none";
-      if (guestControls) guestControls.style.display = "block";
     }
   };
 
@@ -4542,6 +3863,10 @@ findPathAStar(startX, startY, endX, endY) {
             if (homeScreen) {
               homeScreen.style.display = "flex";
             }
+
+            if (typeof window.__fadeOutMadeBySplash === "function") {
+              window.__fadeOutMadeBySplash();
+            }
             
             this.running = true;
             this.loop();
@@ -4582,10 +3907,6 @@ findPathAStar(startX, startY, endX, endY) {
       if (this.world) {
         this.world.camera.w = this.canvas.width;
         this.world.camera.h = this.canvas.height;
-        this.world.camera1.w = this.canvas.width;
-        this.world.camera1.h = this.canvas.height / 2;
-        this.world.camera2.w = this.canvas.width;
-        this.world.camera2.h = this.canvas.height / 2;
       }
     }
   }
