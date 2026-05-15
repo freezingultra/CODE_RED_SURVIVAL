@@ -35,6 +35,13 @@
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function randRange(a, b) { return a + Math.random() * (b - a); }
   function dist2(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
+  function createSeededRandom(seed) {
+    let state = (Number(seed) || 1) >>> 0;
+    return () => {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+  }
 
   const Log = {
     info: (...a) => console.info("[GAME]", ...a),
@@ -704,9 +711,11 @@
 
   // Player
   class Player {
-    constructor(x, y) {
+    constructor(x, y, options = {}) {
       this.x = x;
       this.y = y;
+      this.name = options.name || "Player";
+      this.networkId = options.networkId || null;
       this.radius = 12;
       this.speed = 180;
       this.hp = 100;
@@ -760,14 +769,16 @@
       this.pickupRadius = 1;
       this.rainbowCrystals = 0;
       const perm = PermanentUpgrades.load();
-      this.color = perm.playerColor || "#00d9ff";
+      this.color = options.color || perm.playerColor || "#00d9ff";
       this.canShoot = true;
       this.magAmmo = this.weapons[0].magSize; // Initialize with first weapon's mag size
       this.reloadTimer = 0;
       this.railgunSpinAngle = 0;
       this.reloadKeyPressed = false; // Track if R key was pressed to prevent continuous reload
       
-      this.applyPermanentUpgrades();
+      if (options.applyUpgrades !== false) {
+        this.applyPermanentUpgrades();
+      }
     }
 
     applyPermanentUpgrades() {
@@ -874,7 +885,47 @@
       }
     }
 
-    fire(world) {
+    updateFromNetworkInput(dt, world, input = {}) {
+      let mx = 0, my = 0;
+      if (input.up) my -= 1;
+      if (input.down) my += 1;
+      if (input.left) mx -= 1;
+      if (input.right) mx += 1;
+
+      const len = Math.hypot(mx, my);
+      if (len > 0) { mx /= len; my /= len; }
+
+      const speed = this.speed * this.speedMul * (input.sprint ? 1.4 : 1);
+      const newX = this.x + mx * speed * dt;
+      const newY = this.y + my * speed * dt;
+      if (!world.checkCollision(newX, this.y, this.radius)) this.x = newX;
+      if (!world.checkCollision(this.x, newY, this.radius)) this.y = newY;
+
+      this.x = clamp(this.x, this.radius, world.mapW * world.tileSize - this.radius);
+      this.y = clamp(this.y, this.radius, world.mapH * world.tileSize - this.radius);
+      this.weaponIndex = clamp(input.weaponIndex || this.weaponIndex, 0, this.weapons.length - 1);
+      this.shootCooldown -= dt;
+      this.reloadTimer = Math.max(0, this.reloadTimer - dt);
+
+      const weapon = this.weapons[this.weaponIndex];
+      if (weapon.magSize !== undefined) {
+        if (input.reload && this.reloadTimer <= 0 && this.magAmmo < weapon.magSize) {
+          this.reloadTimer = 3;
+        }
+        if (this.magAmmo <= 0 && this.reloadTimer <= 0) {
+          this.reloadTimer = 3;
+        }
+        if (this.reloadTimer <= 0 && this.magAmmo < weapon.magSize) {
+          this.magAmmo = weapon.magSize;
+        }
+      }
+
+      if (input.shoot && this.shootCooldown <= 0) {
+        this.fire(world, input.aimX, input.aimY, "player");
+      }
+    }
+
+    fire(world, targetX = null, targetY = null, owner = "player") {
       const weapon = this.weapons[this.weaponIndex];
       // Only check magazine if the weapon has one
       if (weapon.magSize !== undefined) {
@@ -910,7 +961,7 @@
             vx: 0,
             vy: 0,
             dmg: 150,
-            owner: "player",
+            owner,
             radius: 6,
             travel: 0,
             maxTravel: Infinity,
@@ -927,7 +978,9 @@
       }
       
       this.shootCooldown = weapon.fireRate;
-      const angle = Math.atan2(Input.mouse.y + world.camera.y - this.y, Input.mouse.x + world.camera.x - this.x);
+      const aimX = targetX === null ? Input.mouse.x + world.camera.x : targetX;
+      const aimY = targetY === null ? Input.mouse.y + world.camera.y : targetY;
+      const angle = Math.atan2(aimY - this.y, aimX - this.x);
 
       for (let i = 0; i < weapon.bullets; i++) {
         const spread = (Math.random() - 0.5) * (weapon.spread * Math.PI / 180);
@@ -938,7 +991,7 @@
           vx: Math.cos(a) * 850,
           vy: Math.sin(a) * 850,
           dmg: weapon.dmg,
-          owner: "player",
+          owner,
           radius: 4,
           travel: 0,
           maxTravel: 1400
@@ -947,7 +1000,7 @@
       if (weapon.magSize !== undefined) {
         this.magAmmo--;
         if (this.magAmmo <= 0) {
-          this.reloadTimer = weapon.reloadTime;
+          this.reloadTimer = weapon.reloadTime || 3;
         }
       }
       sfxShoot();
@@ -1090,7 +1143,7 @@
     }
 
     update(dt, world) {
-      const p = world.player;
+      const p = world.getNearestLivingPlayer(this.x, this.y) || world.player;
       const dx = p.x - this.x, dy = p.y - this.y;
       const d = Math.hypot(dx, dy) || 1;
 
@@ -1146,7 +1199,7 @@
             world.spawnParticles(p.x, p.y, 5, "#ff6600");
             sfxHit();
             
-            if (p.hp <= 0) {
+            if (p === world.player && p.hp <= 0) {
               world.gameOver();
             }
           }
@@ -1336,9 +1389,18 @@
         Hard: { enemySpeed: 1.3, spawnMult: 1.4, enemyHpMult: 1.4 },
         Nightmare: { enemySpeed: 1.6, spawnMult: 1.8, enemyHpMult: 1.7 }
       };
+      this.multiplayerMode = "single";
+      this.multiplayerClient = null;
+      this.networkId = null;
+      this.remotePlayers = new Map();
+      this.remoteInputs = new Map();
+      this.networkSnapshotTimer = 0;
+      this.networkInputTimer = 0;
+      this.pendingSnapshot = null;
     }
 
-    generateMaze() {
+    generateMaze(seed = null) {
+      const random = seed === null ? Math.random : createSeededRandom(seed);
       this.map.fill(1);
       const roomSize = 8, corridorWidth = 3;
       
@@ -1353,7 +1415,7 @@
               }
             }
           }
-          if (rx < Math.floor(this.mapW / roomSize) - 1 && Math.random() > 0.3) {
+          if (rx < Math.floor(this.mapW / roomSize) - 1 && random() > 0.3) {
             for (let x = roomSize - 1; x < roomSize + corridorWidth; x++) {
               for (let y = Math.floor(roomSize / 3); y < Math.floor(roomSize * 2 / 3); y++) {
                 const mx = roomX + x, my = roomY + y;
@@ -1363,7 +1425,7 @@
               }
             }
           }
-          if (ry < Math.floor(this.mapH / roomSize) - 1 && Math.random() > 0.3) {
+          if (ry < Math.floor(this.mapH / roomSize) - 1 && random() > 0.3) {
             for (let y = roomSize - 1; y < roomSize + corridorWidth; y++) {
               for (let x = Math.floor(roomSize / 3); x < Math.floor(roomSize * 2 / 3); x++) {
                 const mx = roomX + x, my = roomY + y;
@@ -1393,6 +1455,204 @@
         if (this.map[my * this.mapW + mx] === 1) return true;
       }
       return false;
+    }
+
+    resetMultiplayerWorld(seed) {
+      this.generateMaze(seed);
+      this.player.x = this.mapW * this.tileSize / 2;
+      this.player.y = this.mapH * this.tileSize / 2;
+      this.player.hp = this.player.maxHp;
+      this.player.coins = 0;
+      this.player.gems = 0;
+      this.player.kills = 0;
+      this.player.magAmmo = this.player.weapons[this.player.weaponIndex].magSize || this.player.magAmmo;
+      this.enemies = [];
+      this.bullets = [];
+      this.loots = [];
+      this.particles = [];
+      this.wave = 0;
+      this.spawnTimer = 0;
+      this.waveTimer = 0;
+      this.isRunning = false;
+      this.paused = false;
+      this.remotePlayers.clear();
+      this.remoteInputs.clear();
+    }
+
+    startHostedMultiplayer(client) {
+      this.multiplayerMode = "host";
+      this.multiplayerClient = client;
+      this.networkId = client.id;
+      this.player.networkId = client.id;
+      this.player.name = this.userName || "Host";
+      this.resetMultiplayerWorld(client.seed || Date.now());
+      this.startWave();
+    }
+
+    startGuestMultiplayer(client) {
+      this.multiplayerMode = "guest";
+      this.multiplayerClient = client;
+      this.networkId = client.id;
+      this.resetMultiplayerWorld(client.seed || Date.now());
+      this.isRunning = true;
+    }
+
+    addRemotePlayer(playerInfo) {
+      if (!playerInfo || playerInfo.id === this.networkId || this.remotePlayers.has(playerInfo.id)) return;
+      const spawnOffset = 80 + this.remotePlayers.size * 45;
+      const player = new Player(
+        this.mapW * this.tileSize / 2 + spawnOffset,
+        this.mapH * this.tileSize / 2,
+        {
+          name: playerInfo.name || "Player",
+          networkId: playerInfo.id,
+          color: playerInfo.color || "#00ff88",
+          applyUpgrades: false
+        }
+      );
+      this.remotePlayers.set(playerInfo.id, player);
+      this.remoteInputs.set(playerInfo.id, {});
+    }
+
+    removeRemotePlayer(playerId) {
+      this.remotePlayers.delete(playerId);
+      this.remoteInputs.delete(playerId);
+    }
+
+    getLivingPlayers() {
+      return [this.player, ...this.remotePlayers.values()].filter(player => player && player.hp > 0);
+    }
+
+    getNearestLivingPlayer(x, y) {
+      let nearest = null;
+      let nearestDist = Infinity;
+      for (const player of this.getLivingPlayers()) {
+        const distance = dist2(x, y, player.x, player.y);
+        if (distance < nearestDist) {
+          nearest = player;
+          nearestDist = distance;
+        }
+      }
+      return nearest;
+    }
+
+    createNetworkInput() {
+      const upgrades = PermanentUpgrades.load();
+      const controls = upgrades.controls || PermanentUpgrades.getDefaults().controls;
+      return {
+        up: !!Input.keys[controls.moveUp],
+        down: !!Input.keys[controls.moveDown],
+        left: !!Input.keys[controls.moveLeft],
+        right: !!Input.keys[controls.moveRight],
+        sprint: !!Input.keys[controls.sprint],
+        reload: !!Input.keys.r,
+        shoot: !!(Input.mouse.down || Input.keys[' ']),
+        aimX: Input.mouse.x + this.camera.x,
+        aimY: Input.mouse.y + this.camera.y,
+        weaponIndex: this.player.weaponIndex
+      };
+    }
+
+    playerSnapshot(player, role = "guest") {
+      return {
+        id: player.networkId,
+        name: player.name,
+        role,
+        x: player.x,
+        y: player.y,
+        hp: player.hp,
+        maxHp: player.maxHp,
+        coins: player.coins,
+        gems: player.gems,
+        redGems: player.redGems,
+        rainbowCrystals: player.rainbowCrystals,
+        kills: player.kills,
+        weaponIndex: player.weaponIndex,
+        magAmmo: player.magAmmo,
+        reloadTimer: player.reloadTimer,
+        color: player.color,
+        secondaryColor: player.secondaryColor
+      };
+    }
+
+    createNetworkSnapshot() {
+      return {
+        wave: this.wave,
+        isRunning: this.isRunning,
+        waveTimer: this.waveTimer,
+        waveTimeLimit: this.waveTimeLimit,
+        players: [
+          this.playerSnapshot(this.player, "host"),
+          ...[...this.remotePlayers.values()].map(player => this.playerSnapshot(player))
+        ],
+        enemies: this.enemies.map(enemy => ({
+          x: enemy.x,
+          y: enemy.y,
+          type: enemy.type,
+          hp: enemy.hp,
+          maxHp: enemy.maxHp,
+          speed: enemy.speed,
+          radius: enemy.radius
+        })),
+        bullets: this.bullets.map(bullet => ({
+          x: bullet.x,
+          y: bullet.y,
+          vx: bullet.vx,
+          vy: bullet.vy,
+          dmg: bullet.dmg,
+          owner: bullet.owner,
+          radius: bullet.radius,
+          travel: bullet.travel,
+          maxTravel: bullet.maxTravel,
+          isLaser: bullet.isLaser,
+          angle: bullet.angle,
+          lifetime: bullet.lifetime,
+          age: bullet.age,
+          sourceX: bullet.source ? bullet.source.x : bullet.sourceX,
+          sourceY: bullet.source ? bullet.source.y : bullet.sourceY
+        })),
+        loots: this.loots.map(loot => ({ ...loot }))
+      };
+    }
+
+    applyNetworkSnapshot(snapshot) {
+      if (!snapshot) return;
+      this.wave = snapshot.wave || 0;
+      this.isRunning = !!snapshot.isRunning;
+      this.waveTimer = snapshot.waveTimer || 0;
+      this.waveTimeLimit = snapshot.waveTimeLimit || this.waveTimeLimit;
+
+      const seenPlayers = new Set();
+      for (const playerData of snapshot.players || []) {
+        if (!playerData.id) continue;
+        seenPlayers.add(playerData.id);
+        const target = playerData.id === this.networkId
+          ? this.player
+          : this.remotePlayers.get(playerData.id) || new Player(playerData.x, playerData.y, {
+              name: playerData.name,
+              networkId: playerData.id,
+              color: playerData.color,
+              applyUpgrades: false
+            });
+        Object.assign(target, playerData);
+        if (playerData.id !== this.networkId) this.remotePlayers.set(playerData.id, target);
+      }
+
+      for (const playerId of [...this.remotePlayers.keys()]) {
+        if (!seenPlayers.has(playerId)) this.remotePlayers.delete(playerId);
+      }
+
+      this.enemies = (snapshot.enemies || []).map(data => Object.assign(Object.create(Enemy.prototype), {
+        x: data.x,
+        y: data.y,
+        type: data.type,
+        hp: data.hp,
+        maxHp: data.maxHp || data.hp,
+        speed: data.speed || 65,
+        radius: data.radius || (data.type === "boss" ? 28 : 11)
+      }));
+      this.bullets = (snapshot.bullets || []).map(data => ({ ...data }));
+      this.loots = (snapshot.loots || []).map(data => ({ ...data }));
     }
 
     // Working A* Pathfinding for Code Red: Survival
@@ -1654,6 +1914,11 @@ findPathAStar(startX, startY, endX, endY) {
       }
       this.isRunning = false;
       this.paused = true;
+
+      if (this.multiplayerMode !== "single") {
+        UI.showGameOver("Multiplayer Run Ended", this.player.kills, Math.floor(this.player.coins));
+        return;
+      }
       
       // Save red gems to permanent upgrades (only once)
       const upgrades = PermanentUpgrades.load();
@@ -1702,6 +1967,25 @@ findPathAStar(startX, startY, endX, endY) {
 
     update(dt) {
       if (this.paused) return;
+
+      if (this.multiplayerMode === "guest") {
+        if (this.pendingSnapshot) {
+          this.applyNetworkSnapshot(this.pendingSnapshot);
+          this.pendingSnapshot = null;
+        }
+        this.networkInputTimer += dt;
+        if (this.networkInputTimer >= 1 / 30 && this.multiplayerClient) {
+          this.networkInputTimer = 0;
+          this.multiplayerClient.sendInput(this.createNetworkInput());
+        }
+        const targetX = clamp(this.player.x - this.camera.w / 2, 0, this.mapW * this.tileSize - this.camera.w);
+        const targetY = clamp(this.player.y - this.camera.h / 2, 0, this.mapH * this.tileSize - this.camera.h);
+        this.camera.x += (targetX - this.camera.x) * 0.2;
+        this.camera.y += (targetY - this.camera.y) * 0.2;
+        this.updateHTMLHUD();
+        UI.updateHUD(this);
+        return;
+      }
       
       if (!this.isLoggedIn) {
         this.totalPlayTime += dt;
@@ -1712,7 +1996,7 @@ findPathAStar(startX, startY, endX, endY) {
         }
       }
       
-      if (!this.isRunning && Input.keys[' ']) {
+      if (!this.isRunning && Input.keys[' '] && this.multiplayerMode !== "guest") {
         this.startWave();
       }
 
@@ -1742,6 +2026,11 @@ findPathAStar(startX, startY, endX, endY) {
       }
       
       this.player.update(dt, this);
+      if (this.multiplayerMode === "host") {
+        for (const [playerId, player] of this.remotePlayers) {
+          player.updateFromNetworkInput(dt, this, this.remoteInputs.get(playerId));
+        }
+      }
       
       for (let i = this.bullets.length - 1; i >= 0; i--) {
         const b = this.bullets[i];
@@ -1926,15 +2215,16 @@ findPathAStar(startX, startY, endX, endY) {
             }
           }
         } else if (b.owner === "enemy") {
-          const collisionDist = (b.radius + this.player.radius) * (b.radius + this.player.radius);
-          if (dist2(b.x, b.y, this.player.x, this.player.y) < collisionDist) {
-            const dmg = b.dmg * (1 - (this.player.armor || 0));
-            this.player.hp -= dmg;
-            Log.info("PLAYER HIT! Took " + Math.round(dmg) + " damage. HP: " + Math.round(this.player.hp));
+          const targetPlayer = this.getNearestLivingPlayer(b.x, b.y);
+          const collisionDist = targetPlayer ? (b.radius + targetPlayer.radius) * (b.radius + targetPlayer.radius) : 0;
+          if (targetPlayer && dist2(b.x, b.y, targetPlayer.x, targetPlayer.y) < collisionDist) {
+            const dmg = b.dmg * (1 - (targetPlayer.armor || 0));
+            targetPlayer.hp -= dmg;
+            Log.info("PLAYER HIT! Took " + Math.round(dmg) + " damage. HP: " + Math.round(targetPlayer.hp));
             this.bullets.splice(i, 1);
-            this.spawnParticles(this.player.x, this.player.y, 10, "#ffaaaa");
+            this.spawnParticles(targetPlayer.x, targetPlayer.y, 10, "#ffaaaa");
             sfxHit();
-            if (this.player.hp <= 0) {
+            if (targetPlayer === this.player && this.player.hp <= 0) {
               Log.info("PLAYER DIED!");
               this.gameOver();
             }
@@ -1943,10 +2233,12 @@ findPathAStar(startX, startY, endX, endY) {
       }
       
       for (const e of this.enemies) {
-        const dx = this.player.x - e.x;
-        const dy = this.player.y - e.y;
+        const targetPlayer = this.getNearestLivingPlayer(e.x, e.y);
+        if (!targetPlayer) continue;
+        const dx = targetPlayer.x - e.x;
+        const dy = targetPlayer.y - e.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        const touchDistance = e.radius + this.player.radius;
+        const touchDistance = e.radius + targetPlayer.radius;
         
         if (distance < touchDistance) {
           let rawDmg = 25 * dt;
@@ -1955,16 +2247,16 @@ findPathAStar(startX, startY, endX, endY) {
             rawDmg = 50 * dt;
           }
           
-          const dmg = rawDmg * (1 - (this.player.armor || 0));
-          this.player.hp -= dmg;
+          const dmg = rawDmg * (1 - (targetPlayer.armor || 0));
+          targetPlayer.hp -= dmg;
           
-          Log.info("ENEMY CONTACT! Type: " + e.type + " dealing " + Math.round(rawDmg) + " dmg/sec. Player HP: " + Math.round(this.player.hp));
+          Log.info("ENEMY CONTACT! Type: " + e.type + " dealing " + Math.round(rawDmg) + " dmg/sec. Player HP: " + Math.round(targetPlayer.hp));
           
           if (Math.random() < 0.3) {
-            this.spawnParticles(this.player.x, this.player.y, 2, "#ff0000");
+            this.spawnParticles(targetPlayer.x, targetPlayer.y, 2, "#ff0000");
           }
           
-          if (this.player.hp <= 0) {
+          if (targetPlayer === this.player && this.player.hp <= 0) {
             Log.info("PLAYER KILLED BY ENEMY CONTACT!");
             this.gameOver();
           }
@@ -2005,6 +2297,13 @@ findPathAStar(startX, startY, endX, endY) {
       this.updateHTMLHUD();
       
       UI.updateHUD(this);
+      if (this.multiplayerMode === "host" && this.multiplayerClient) {
+        this.networkSnapshotTimer += dt;
+        if (this.networkSnapshotTimer >= 1 / 15) {
+          this.networkSnapshotTimer = 0;
+          this.multiplayerClient.sendSnapshot(this.createNetworkSnapshot());
+        }
+      }
     }
     
     updateHTMLHUD() {
@@ -2205,6 +2504,13 @@ findPathAStar(startX, startY, endX, endY) {
       for (const e of this.enemies) e.draw(ctx);
       
       this.player.draw(ctx);
+      if (this.multiplayerMode !== "single") {
+        this.drawPlayerName(ctx, this.player);
+        for (const player of this.remotePlayers.values()) {
+          player.draw(ctx);
+          this.drawPlayerName(ctx, player);
+        }
+      }
       
       for (const p of this.particles) {
         const t = 1 - (p.age / p.life);
@@ -2215,6 +2521,19 @@ findPathAStar(startX, startY, endX, endY) {
         ctx.fill();
       }
       ctx.globalAlpha = 1;
+    }
+
+    drawPlayerName(ctx, player) {
+      ctx.save();
+      ctx.font = 'bold 13px "Segoe UI", sans-serif';
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(0,0,0,0.75)";
+      const name = player.name || "Player";
+      const width = ctx.measureText(name).width + 12;
+      ctx.fillRect(player.x - width / 2, player.y - player.radius - 30, width, 18);
+      ctx.fillStyle = player.color || "#00d9ff";
+      ctx.fillText(name, player.x, player.y - player.radius - 16);
+      ctx.restore();
     }
 
     drawMinimap(ctx) {
@@ -2252,6 +2571,11 @@ findPathAStar(startX, startY, endX, endY) {
       ctx.beginPath();
       ctx.arc(x + this.player.x * sx, y + this.player.y * sy, 5, 0, Math.PI * 2);
       ctx.fill();
+      for (const player of this.remotePlayers.values()) {
+        ctx.beginPath();
+        ctx.arc(x + player.x * sx, y + player.y * sy, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.shadowBlur = 0;
     }
 
@@ -2300,6 +2624,59 @@ findPathAStar(startX, startY, endX, endY) {
         controlsScreen: document.getElementById("controlsScreen"),
         promoScreen: document.getElementById("promoScreen")
       };
+
+      const multiplayerBtn = document.getElementById("multiplayerBtn");
+      if (multiplayerBtn) {
+        multiplayerBtn.addEventListener("click", () => {
+          this.elements.homeScreen.style.display = "none";
+          document.getElementById("multiplayerScreen").style.display = "flex";
+          this.prepareMultiplayerPanel();
+        });
+      }
+
+      const multiplayerBackBtn = document.getElementById("multiplayerBackBtn");
+      if (multiplayerBackBtn) {
+        multiplayerBackBtn.addEventListener("click", () => {
+          document.getElementById("multiplayerScreen").style.display = "none";
+          this.elements.homeScreen.style.display = "flex";
+        });
+      }
+
+      const hostGameBtn = document.getElementById("hostGameBtn");
+      if (hostGameBtn) {
+        hostGameBtn.addEventListener("click", () => this.hostLocalGame());
+      }
+
+      const joinGameBtn = document.getElementById("joinGameBtn");
+      if (joinGameBtn) {
+        joinGameBtn.addEventListener("click", () => this.joinLocalGame());
+      }
+
+      const startHostedGameBtn = document.getElementById("startHostedGameBtn");
+      if (startHostedGameBtn) {
+        startHostedGameBtn.addEventListener("click", () => {
+          if (window.game?.world?.multiplayerClient) {
+            window.game.world.multiplayerClient.startMatch();
+          }
+          this.hideAll();
+          const shopBtn = document.getElementById("shopButton");
+          if (shopBtn) shopBtn.style.display = "block";
+        });
+      }
+
+      const copyTunnelLinkBtn = document.getElementById("copyTunnelLinkBtn");
+      if (copyTunnelLinkBtn) {
+        copyTunnelLinkBtn.addEventListener("click", async () => {
+          const tunnelInput = document.getElementById("tunnelLinkInput");
+          const value = tunnelInput ? tunnelInput.value.trim() : "";
+          if (!value) {
+            this.showToast("Paste a Playit link first.");
+            return;
+          }
+          await navigator.clipboard?.writeText(value);
+          this.showToast("Tunnel link copied");
+        });
+      }
 
       const customizeBtn = document.getElementById("customizeBtn");
       if (customizeBtn) {
@@ -2501,6 +2878,149 @@ findPathAStar(startX, startY, endX, endY) {
       
       return screen;
     },
+
+    async prepareMultiplayerPanel() {
+      const status = document.getElementById("multiplayerStatus");
+      const linksPanel = document.getElementById("hostLinksPanel");
+      const playersPanel = document.getElementById("multiplayerPlayers");
+      const startBtn = document.getElementById("startHostedGameBtn");
+      if (status) status.textContent = "Start the local server with npm run host, then host or join here.";
+      if (linksPanel) linksPanel.style.display = "none";
+      if (playersPanel) playersPanel.style.display = "none";
+      if (startBtn) startBtn.style.display = "none";
+      await this.loadHostInfo();
+    },
+
+    async loadHostInfo() {
+      try {
+        const response = await fetch("/api/host-info");
+        if (!response.ok) return null;
+        const info = await response.json();
+        this.renderHostLinks(info);
+        return info;
+      } catch {
+        return null;
+      }
+    },
+
+    renderHostLinks(info) {
+      const linksPanel = document.getElementById("hostLinksPanel");
+      const lanLinks = document.getElementById("lanLinks");
+      const vpnWarning = document.getElementById("vpnWarning");
+      if (!linksPanel || !lanLinks || !info) return;
+
+      linksPanel.style.display = "block";
+      lanLinks.innerHTML = "";
+      for (const url of info.urls || []) {
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;gap:8px;align-items:center;";
+        row.innerHTML = `<input readonly value="${url}" style="flex:1;padding:8px;background:#050505;border:1px solid #333;border-radius:6px;color:#fff;"><button type="button" style="padding:8px 10px;">Copy</button>`;
+        row.querySelector("button").addEventListener("click", async () => {
+          await navigator.clipboard?.writeText(url);
+          UI.showToast("Link copied");
+        });
+        lanLinks.appendChild(row);
+      }
+
+      if (vpnWarning && info.vpnHints && info.vpnHints.length > 0) {
+        vpnWarning.style.display = "block";
+        vpnWarning.textContent = "VPN-like network adapters detected. If same-internet players cannot join, turn off VPNs temporarily: " + info.vpnHints.join(", ");
+      } else if (vpnWarning) {
+        vpnWarning.style.display = "none";
+      }
+    },
+
+    updateMultiplayerPlayers(players = []) {
+      const playersPanel = document.getElementById("multiplayerPlayers");
+      if (!playersPanel) return;
+      playersPanel.style.display = "block";
+      playersPanel.innerHTML = `<strong style="color:#00d9ff;">Players</strong>` + players.map(player => `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+          <span style="width:10px;height:10px;border-radius:50%;background:${player.color || '#00d9ff'};display:inline-block;"></span>
+          <span>${player.name || 'Player'} ${player.role === 'host' ? '(host)' : ''}</span>
+        </div>
+      `).join("");
+    },
+
+    bindMultiplayerClient(client) {
+      client.on("error", data => UI.showToast(data.message || "Multiplayer error"));
+      client.on("closed", () => UI.showToast("Multiplayer connection closed"));
+      client.on("lobby", data => UI.updateMultiplayerPlayers(data.players || []));
+      client.on("hostAccepted", data => {
+        const status = document.getElementById("multiplayerStatus");
+        const startBtn = document.getElementById("startHostedGameBtn");
+        if (status) status.textContent = "Hosting from this device. Share a LAN link or paste your Playit tunnel link for global players.";
+        if (startBtn) startBtn.style.display = "block";
+        UI.renderHostLinks(data);
+        window.game.world.startHostedMultiplayer(client);
+      });
+      client.on("joinAccepted", data => {
+        const status = document.getElementById("multiplayerStatus");
+        if (status) status.textContent = data.matchStarted ? "Joined match." : "Joined lobby. Waiting for host.";
+        window.game.world.startGuestMultiplayer(client);
+        if (data.snapshot) window.game.world.pendingSnapshot = data.snapshot;
+      });
+      client.on("guestJoined", data => {
+        window.game.world.addRemotePlayer(data.player);
+        UI.showToast((data.player?.name || "A player") + " joined");
+      });
+      client.on("guestLeft", data => window.game.world.removeRemotePlayer(data.playerId));
+      client.on("guestInput", data => window.game.world.remoteInputs.set(data.playerId, data.input || {}));
+      client.on("snapshot", data => {
+        if (window.game.world.multiplayerMode === "guest") window.game.world.pendingSnapshot = data.snapshot;
+      });
+      client.on("matchStarted", () => {
+        const multiplayerScreen = document.getElementById("multiplayerScreen");
+        if (multiplayerScreen) multiplayerScreen.style.display = "none";
+        const shopBtn = document.getElementById("shopButton");
+        if (shopBtn) shopBtn.style.display = "block";
+      });
+      client.on("hostClosed", () => {
+        UI.showToast("Host closed the game");
+        setTimeout(() => location.reload(), 1200);
+      });
+    },
+
+    async hostLocalGame() {
+      if (!window.LocalMultiplayerClient) {
+        UI.showToast("Local multiplayer client missing");
+        return;
+      }
+      const client = new LocalMultiplayerClient();
+      this.bindMultiplayerClient(client);
+      const status = document.getElementById("multiplayerStatus");
+      if (status) status.textContent = "Starting host...";
+      try {
+        await client.hostGame({
+          name: window.game.world.userName || "Host",
+          color: window.game.world.player.color,
+          seed: Date.now()
+        });
+      } catch (error) {
+        if (status) status.textContent = "Could not connect. Run npm run host and open the local server URL.";
+        UI.showToast(error.message);
+      }
+    },
+
+    async joinLocalGame() {
+      if (!window.LocalMultiplayerClient) {
+        UI.showToast("Local multiplayer client missing");
+        return;
+      }
+      const client = new LocalMultiplayerClient();
+      this.bindMultiplayerClient(client);
+      const status = document.getElementById("multiplayerStatus");
+      if (status) status.textContent = "Joining host...";
+      try {
+        await client.joinGame({
+          name: window.game.world.userName || "Player",
+          color: window.game.world.player.color
+        });
+      } catch (error) {
+        if (status) status.textContent = "Could not connect. Make sure you opened the host's LAN or tunnel link.";
+        UI.showToast(error.message);
+      }
+    },
     
     async updateLeaderboard(difficultyFilter = null) {
       const loading = document.getElementById("leaderboardLoading");
@@ -2688,6 +3208,10 @@ findPathAStar(startX, startY, endX, endY) {
       const shopButton = document.getElementById("shopButton");
       if (shopButton) {
         shopButton.addEventListener("click", () => {
+          if (window.game?.world?.multiplayerMode !== "single") {
+            this.showToast("Shop is disabled during multiplayer.");
+            return;
+          }
           this.openShop();
         });
         shopButton.style.display = "none";
@@ -2712,6 +3236,10 @@ findPathAStar(startX, startY, endX, endY) {
         
         if (pressedKey === controls.shop) {
           e.preventDefault();
+          if (window.game.world.multiplayerMode !== "single") {
+            this.showToast("Shop is disabled during multiplayer.");
+            return;
+          }
           this.openShop();
         }
         

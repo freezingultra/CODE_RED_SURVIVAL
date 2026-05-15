@@ -3,8 +3,14 @@
   "version": "1.0.0",
   "description": "Code Red: Survival browser game",
   "main": "game.js",
-  "scripts": {},
+  "scripts": {
+    "host": "node local_multiplayer_server.js",
+    "start": "node local_multiplayer_server.js"
+  },
   "keywords": ["game", "survival", "shooter"],
   "author": "Shivank Mishra",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
 }
