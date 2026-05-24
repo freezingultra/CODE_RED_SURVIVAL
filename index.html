@@ -631,21 +631,26 @@
   <div id="multiplayerScreen" class="overlay" style="display: none;">
     <div class="dialog" style="max-width: 760px;">
       <h2>🌐 Multiplayer</h2>
-      <p style="color: #aaa; margin-bottom: 20px;">Host from this laptop, then share a local Wi-Fi link or a Playit tunnel link.</p>
+      <p style="color: #aaa; margin-bottom: 20px;">Host a room, share the 7-character code, and play from anywhere.</p>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
         <button id="hostGameBtn" style="padding: 14px; font-size: 16px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #06150d;">Host Game</button>
-        <button id="joinGameBtn" style="padding: 14px; font-size: 16px; background: linear-gradient(135deg, #ffaa00, #ff6600); color: #180900;">Join This Server</button>
+        <button id="joinGameBtn" style="padding: 14px; font-size: 16px; background: linear-gradient(135deg, #ffaa00, #ff6600); color: #180900;">Join Room</button>
       </div>
       <div id="hostLinksPanel" style="display:none;text-align:left;background:rgba(0,0,0,0.35);border:1px solid rgba(0,217,255,0.45);border-radius:8px;padding:14px;margin-bottom:16px;">
-        <h3 style="color:#00d9ff;margin-bottom:10px;">Share Links</h3>
-        <p style="color:#aaa;font-size:14px;margin-bottom:10px;">Same internet players can use one of these detected device links:</p>
-        <div id="lanLinks" style="display:grid;gap:8px;margin-bottom:12px;"></div>
-        <label for="tunnelLinkInput" style="display:block;color:#aaa;font-size:14px;margin-bottom:6px;">Playit/global tunnel link</label>
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
-          <input id="tunnelLinkInput" type="text" placeholder="Paste your playit.gg tunnel URL here" style="flex:1;padding:10px;background:#050505;border:1px solid #00d9ff;border-radius:6px;color:#fff;">
-          <button id="copyTunnelLinkBtn" type="button" style="padding:10px 12px;">Copy</button>
+        <h3 style="color:#00d9ff;margin-bottom:10px;">Room Code</h3>
+        <p style="color:#aaa;font-size:14px;margin-bottom:8px;">Share this code with your friend:</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+          <div id="lanJoinCode" style="flex:1;text-align:center;font-family:monospace;font-size:32px;letter-spacing:4px;color:#00ff88;background:#050505;border:1px solid #00ff88;border-radius:8px;padding:10px;">-------</div>
+          <button id="copyJoinCodeBtn" type="button" style="padding:12px;">Copy</button>
         </div>
-        <div id="vpnWarning" style="display:none;color:#ffaa00;font-size:13px;line-height:1.4;"></div>
+        <p style="color:#aaa;font-size:13px;line-height:1.4;">The host device runs the world. Cloudflare only connects the players.</p>
+      </div>
+      <div id="joinCodePanel" style="text-align:left;background:rgba(0,0,0,0.25);border:1px solid rgba(255,170,0,0.5);border-radius:8px;padding:14px;margin-bottom:16px;">
+        <label for="joinCodeInput" style="display:block;color:#ffaa00;font-weight:bold;margin-bottom:8px;">Join with room code</label>
+        <div style="display:flex;gap:8px;">
+          <input id="joinCodeInput" maxlength="7" placeholder="1A2B3C4" style="flex:1;text-transform:uppercase;letter-spacing:3px;text-align:center;padding:10px;background:#050505;border:1px solid #ffaa00;border-radius:6px;color:#fff;font-family:monospace;font-size:18px;">
+          <button id="joinCodeBtn" type="button" style="padding:10px 12px;background:linear-gradient(135deg,#ffaa00,#ff6600);color:#180900;">Go</button>
+        </div>
       </div>
       <div id="multiplayerStatus" style="min-height:24px;color:#00d9ff;font-weight:bold;margin-bottom:14px;"></div>
       <div id="multiplayerPlayers" style="display:none;text-align:left;background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:16px;"></div>
@@ -981,7 +986,7 @@
   <!-- Supabase Client Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="promo_codes.js"></script>
-  <script src="local_multiplayer_client.js"></script>
+  <script src="multiplayer_client.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

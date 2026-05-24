@@ -1974,7 +1974,7 @@ findPathAStar(startX, startY, endX, endY) {
           this.pendingSnapshot = null;
         }
         this.networkInputTimer += dt;
-        if (this.networkInputTimer >= 1 / 30 && this.multiplayerClient) {
+        if (this.networkInputTimer >= 1 / 20 && this.multiplayerClient) {
           this.networkInputTimer = 0;
           this.multiplayerClient.sendInput(this.createNetworkInput());
         }
@@ -2299,7 +2299,7 @@ findPathAStar(startX, startY, endX, endY) {
       UI.updateHUD(this);
       if (this.multiplayerMode === "host" && this.multiplayerClient) {
         this.networkSnapshotTimer += dt;
-        if (this.networkSnapshotTimer >= 1 / 15) {
+        if (this.networkSnapshotTimer >= 1 / 10) {
           this.networkSnapshotTimer = 0;
           this.multiplayerClient.sendSnapshot(this.createNetworkSnapshot());
         }
@@ -2644,12 +2644,12 @@ findPathAStar(startX, startY, endX, endY) {
 
       const hostGameBtn = document.getElementById("hostGameBtn");
       if (hostGameBtn) {
-        hostGameBtn.addEventListener("click", () => this.hostLocalGame());
+        hostGameBtn.addEventListener("click", () => this.hostCloudGame());
       }
 
       const joinGameBtn = document.getElementById("joinGameBtn");
       if (joinGameBtn) {
-        joinGameBtn.addEventListener("click", () => this.joinLocalGame());
+        joinGameBtn.addEventListener("click", () => this.joinCloudGame());
       }
 
       const startHostedGameBtn = document.getElementById("startHostedGameBtn");
@@ -2664,17 +2664,31 @@ findPathAStar(startX, startY, endX, endY) {
         });
       }
 
-      const copyTunnelLinkBtn = document.getElementById("copyTunnelLinkBtn");
-      if (copyTunnelLinkBtn) {
-        copyTunnelLinkBtn.addEventListener("click", async () => {
-          const tunnelInput = document.getElementById("tunnelLinkInput");
-          const value = tunnelInput ? tunnelInput.value.trim() : "";
-          if (!value) {
-            this.showToast("Paste a Playit link first.");
+      const copyJoinCodeBtn = document.getElementById("copyJoinCodeBtn");
+      if (copyJoinCodeBtn) {
+        copyJoinCodeBtn.addEventListener("click", async () => {
+          const code = (document.getElementById("lanJoinCode")?.textContent || "").trim();
+          if (!/^[0-9A-Z]{7}$/.test(code)) {
+            this.showToast("Host a game to get a code.");
             return;
           }
-          await navigator.clipboard?.writeText(value);
-          this.showToast("Tunnel link copied");
+          await navigator.clipboard?.writeText(code);
+          this.showToast("Join code copied");
+        });
+      }
+
+      const joinCodeBtn = document.getElementById("joinCodeBtn");
+      if (joinCodeBtn) {
+        joinCodeBtn.addEventListener("click", () => this.joinWithCode());
+      }
+
+      const joinCodeInput = document.getElementById("joinCodeInput");
+      if (joinCodeInput) {
+        joinCodeInput.addEventListener("input", () => {
+          joinCodeInput.value = joinCodeInput.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 7);
+        });
+        joinCodeInput.addEventListener("keydown", event => {
+          if (event.key === "Enter") this.joinWithCode();
         });
       }
 
@@ -2806,6 +2820,7 @@ findPathAStar(startX, startY, endX, endY) {
 
       this.bindEvents();
       this.updateHomeStats();
+      this.tryAutoJoinFromCode();
     },
     
     createLeaderboardScreen() {
@@ -2884,50 +2899,43 @@ findPathAStar(startX, startY, endX, endY) {
       const linksPanel = document.getElementById("hostLinksPanel");
       const playersPanel = document.getElementById("multiplayerPlayers");
       const startBtn = document.getElementById("startHostedGameBtn");
-      if (status) status.textContent = "Start the local server with npm run host, then host or join here.";
+      if (status) status.textContent = "Host a room or enter a 7-character code. Friends can join from anywhere.";
       if (linksPanel) linksPanel.style.display = "none";
       if (playersPanel) playersPanel.style.display = "none";
       if (startBtn) startBtn.style.display = "none";
-      await this.loadHostInfo();
-    },
-
-    async loadHostInfo() {
-      try {
-        const response = await fetch("/api/host-info");
-        if (!response.ok) return null;
-        const info = await response.json();
-        this.renderHostLinks(info);
-        return info;
-      } catch {
-        return null;
-      }
     },
 
     renderHostLinks(info) {
       const linksPanel = document.getElementById("hostLinksPanel");
-      const lanLinks = document.getElementById("lanLinks");
-      const vpnWarning = document.getElementById("vpnWarning");
-      if (!linksPanel || !lanLinks || !info) return;
+      const lanJoinCode = document.getElementById("lanJoinCode");
+      if (!linksPanel || !info) return;
 
       linksPanel.style.display = "block";
-      lanLinks.innerHTML = "";
-      for (const url of info.urls || []) {
-        const row = document.createElement("div");
-        row.style.cssText = "display:flex;gap:8px;align-items:center;";
-        row.innerHTML = `<input readonly value="${url}" style="flex:1;padding:8px;background:#050505;border:1px solid #333;border-radius:6px;color:#fff;"><button type="button" style="padding:8px 10px;">Copy</button>`;
-        row.querySelector("button").addEventListener("click", async () => {
-          await navigator.clipboard?.writeText(url);
-          UI.showToast("Link copied");
-        });
-        lanLinks.appendChild(row);
+      if (lanJoinCode) {
+        const code = info.roomCode || info.joinCode || "-------";
+        lanJoinCode.textContent = code;
+        lanJoinCode.style.letterSpacing = /^[0-9A-Z]{7}$/.test(code) ? "4px" : "0";
+        lanJoinCode.style.fontSize = /^[0-9A-Z]{7}$/.test(code) ? "32px" : "18px";
       }
+    },
 
-      if (vpnWarning && info.vpnHints && info.vpnHints.length > 0) {
-        vpnWarning.style.display = "block";
-        vpnWarning.textContent = "VPN-like network adapters detected. If same-internet players cannot join, turn off VPNs temporarily: " + info.vpnHints.join(", ");
-      } else if (vpnWarning) {
-        vpnWarning.style.display = "none";
-      }
+    joinWithCode() {
+      const input = document.getElementById("joinCodeInput");
+      const code = input ? input.value.trim().toUpperCase() : "";
+      this.joinCloudGame(code);
+    },
+
+    tryAutoJoinFromCode() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("join");
+      if (!code) return;
+      const input = document.getElementById("joinCodeInput");
+      if (input) input.value = code.toUpperCase();
+      this.elements.homeScreen.style.display = "none";
+      document.getElementById("multiplayerScreen").style.display = "flex";
+      const status = document.getElementById("multiplayerStatus");
+      if (status) status.textContent = "Joining from code...";
+      setTimeout(() => this.joinCloudGame(code), 250);
     },
 
     updateMultiplayerPlayers(players = []) {
@@ -2949,7 +2957,7 @@ findPathAStar(startX, startY, endX, endY) {
       client.on("hostAccepted", data => {
         const status = document.getElementById("multiplayerStatus");
         const startBtn = document.getElementById("startHostedGameBtn");
-        if (status) status.textContent = "Hosting from this device. Share a LAN link or paste your Playit tunnel link for global players.";
+        if (status) status.textContent = `Hosting room ${data.roomCode || data.joinCode}. Share the code, then start the match.`;
         if (startBtn) startBtn.style.display = "block";
         UI.renderHostLinks(data);
         window.game.world.startHostedMultiplayer(client);
@@ -2981,15 +2989,15 @@ findPathAStar(startX, startY, endX, endY) {
       });
     },
 
-    async hostLocalGame() {
-      if (!window.LocalMultiplayerClient) {
-        UI.showToast("Local multiplayer client missing");
+    async hostCloudGame() {
+      if (!window.MultiplayerClient) {
+        UI.showToast("Multiplayer client missing");
         return;
       }
-      const client = new LocalMultiplayerClient();
+      const client = new MultiplayerClient();
       this.bindMultiplayerClient(client);
       const status = document.getElementById("multiplayerStatus");
-      if (status) status.textContent = "Starting host...";
+      if (status) status.textContent = "Creating online room...";
       try {
         await client.hostGame({
           name: window.game.world.userName || "Host",
@@ -2997,27 +3005,30 @@ findPathAStar(startX, startY, endX, endY) {
           seed: Date.now()
         });
       } catch (error) {
-        if (status) status.textContent = "Could not connect. Run npm run host and open the local server URL.";
+        if (status) status.textContent = "Could not create an online room. Try again.";
         UI.showToast(error.message);
       }
     },
 
-    async joinLocalGame() {
-      if (!window.LocalMultiplayerClient) {
-        UI.showToast("Local multiplayer client missing");
+    async joinCloudGame(roomCode = null) {
+      if (!window.MultiplayerClient) {
+        UI.showToast("Multiplayer client missing");
         return;
       }
-      const client = new LocalMultiplayerClient();
+      const input = document.getElementById("joinCodeInput");
+      const code = (roomCode || (input ? input.value : "") || "").trim().toUpperCase();
+      const client = new MultiplayerClient({ roomCode: code });
       this.bindMultiplayerClient(client);
       const status = document.getElementById("multiplayerStatus");
-      if (status) status.textContent = "Joining host...";
+      if (status) status.textContent = "Joining online room...";
       try {
         await client.joinGame({
+          code,
           name: window.game.world.userName || "Player",
           color: window.game.world.player.color
         });
       } catch (error) {
-        if (status) status.textContent = "Could not connect. Make sure you opened the host's LAN or tunnel link.";
+        if (status) status.textContent = "Could not join that room. Check the code and try again.";
         UI.showToast(error.message);
       }
     },

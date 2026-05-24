@@ -2,15 +2,12 @@
   "name": "code-red-survival",
   "version": "1.0.0",
   "description": "Code Red: Survival browser game",
-  "main": "game.js",
+  "main": "worker.js",
   "scripts": {
-    "host": "node local_multiplayer_server.js",
-    "start": "node local_multiplayer_server.js"
+    "deploy": "npx wrangler deploy --config wrangler.jsonc",
+    "preview": "npx wrangler dev --config wrangler.jsonc"
   },
   "keywords": ["game", "survival", "shooter"],
   "author": "Shivank Mishra",
-  "license": "UNLICENSED",
-  "dependencies": {
-    "ws": "^8.18.3"
-  }
+  "license": "UNLICENSED"
 }

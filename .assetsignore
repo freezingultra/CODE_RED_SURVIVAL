@@ -2,12 +2,18 @@ node_modules/
 .git/
 .idea/
 .wrangler/
+_codex_push_repo_*/
 
+.assetsignore
+.gitignore
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 bun.lock
 package-lock.json
 
+README.md
+package.json
 render.yaml
-local_multiplayer_server.js
+wrangler.jsonc
+worker.js
