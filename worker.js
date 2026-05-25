@@ -47,8 +47,9 @@ export default {
 };
 
 export class MultiplayerRoom {
-  constructor(state) {
+  constructor(state, ctx) {
     this.state = state;
+    this.ctx = ctx;
     this.code = null;
     this.hostId = null;
     this.seed = null;
@@ -240,7 +241,8 @@ export class MultiplayerRoom {
     try {
       client.socket.send(JSON.stringify(message));
     } catch {
-      this.removeClient(client.id);
+      // Defer removal to avoid mutating clients map during iteration
+      Promise.resolve().then(() => this.removeClient(client.id));
     }
   }
 

@@ -1486,7 +1486,9 @@
       this.player.networkId = client.id;
       this.player.name = this.userName || "Host";
       this.resetMultiplayerWorld(client.seed || Date.now());
-      this.startWave();
+      // Do NOT call startWave() here — the host waits in the lobby
+      // until they click "Start Hosted Match", which sends startMatch
+      // to the server which broadcasts matchStarted to everyone.
     }
 
     startGuestMultiplayer(client) {
@@ -1494,7 +1496,7 @@
       this.multiplayerClient = client;
       this.networkId = client.id;
       this.resetMultiplayerWorld(client.seed || Date.now());
-      this.isRunning = true;
+      // isRunning will be set to true by startWave() when the match begins
     }
 
     addRemotePlayer(playerInfo) {
@@ -2657,6 +2659,10 @@ findPathAStar(startX, startY, endX, endY) {
         startHostedGameBtn.addEventListener("click", () => {
           if (window.game?.world?.multiplayerClient) {
             window.game.world.multiplayerClient.startMatch();
+            // Start the wave for the host — guests get matchStarted via WebSocket
+            if (window.game.world.multiplayerMode === "host") {
+              window.game.world.startWave();
+            }
           }
           this.hideAll();
           const shopBtn = document.getElementById("shopButton");
@@ -2967,6 +2973,12 @@ findPathAStar(startX, startY, endX, endY) {
         if (status) status.textContent = data.matchStarted ? "Joined match." : "Joined lobby. Waiting for host.";
         window.game.world.startGuestMultiplayer(client);
         if (data.snapshot) window.game.world.pendingSnapshot = data.snapshot;
+        // If the match is already in progress, start the wave right away
+        if (data.matchStarted) {
+          const multiplayerScreen = document.getElementById("multiplayerScreen");
+          if (multiplayerScreen) multiplayerScreen.style.display = "none";
+          window.game.world.startWave();
+        }
       });
       client.on("guestJoined", data => {
         window.game.world.addRemotePlayer(data.player);
@@ -2982,6 +2994,10 @@ findPathAStar(startX, startY, endX, endY) {
         if (multiplayerScreen) multiplayerScreen.style.display = "none";
         const shopBtn = document.getElementById("shopButton");
         if (shopBtn) shopBtn.style.display = "block";
+        // Guests need to start their wave when the host launches the match
+        if (window.game?.world?.multiplayerMode === "guest") {
+          window.game.world.startWave();
+        }
       });
       client.on("hostClosed", () => {
         UI.showToast("Host closed the game");
