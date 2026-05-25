@@ -9,7 +9,7 @@
 
   <!-- ✅ SEO & Search Visibility -->
   <meta name="robots" content="index, follow">
-  <meta name="description" content="Play Code Red: Survival - a fast-paced top-down survival shooter where you battle waves of enemies inside eerie backrooms mazes. Upgrade weapons, defeat bosses, and survive as long as possible.">
+  <meta name="description" content="Play Code Red: Survival - a fast-paced top-down survival shooter where you battle waves of enemies inside eerie backrooms mazes. Upgrade weapons, defeat bosses,[...]
   <meta name="keywords" content="Code Red Survival, topdown shooter, survival game, browser shooter, HTML5 game, indie game, action shooter, maze survival, free web game">
 
   <!-- ✅ Open Graph (social media sharing) -->
@@ -520,6 +520,34 @@
         display: block;
       }
     }
+
+    .announcement-content {
+      text-align: left;
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+
+    .announcement-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .announcement-content::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+    }
+
+    .announcement-content::-webkit-scrollbar-thumb {
+      background: rgba(0, 217, 255, 0.5);
+      border-radius: 4px;
+    }
+
+    .announcement-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 217, 255, 0.7);
+    }
   </style>
 </head>
 
@@ -563,68 +591,90 @@
       <span>🔫 <strong>Weapon</strong></span>
       <span id="currentWeapon" style="color: #ff6600; font-weight: bold;">Pistol</span>
     </div>
-    <button id="shopButton" style="position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: linear-gradient(135deg, #ffdd00, #ffaa00); color: #000; border: 2px solid #ffaa00; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; z-index: 500; transition: all 0.3s; box-shadow: 0 4px 15px rgba(255, 221, 0, 0.4);">
+    <button id="shopButton" style="position: fixed; top: 20px; right: 20px; padding: 12px 20px; background: linear-gradient(135deg, #ffdd00, #ffaa00); color: #000; border: 2px solid #ffaa00; bord[...]
       🛒 SHOP (F)
     </button>
+  </div>
+
+  <div id="announcementScreen" class="overlay" style="display: none;">
+    <div class="dialog" style="max-width: 700px;">
+      <h2 style="color: #00ff88; margin-bottom: 10px;">🎉 BIG UPDATE! 🎉</h2>
+      <p style="color: #ffdd00; font-size: 18px; font-weight: bold; margin-bottom: 15px;">Version 1.1.0 - We're Back!</p>
+      <div class="announcement-content">
+        <p style="color: #fff; margin-bottom: 15px;">Hi guys! We are happy to announce a new update for the first time in 6 months, Version 1.1.0! You might have noticed we went from 1.0.75 to 1.1.0, this is because we have finally made a <strong>MAJOR update!</strong></p>
+        
+        <p style="color: #00d9ff; margin-bottom: 15px; font-weight: bold;">🌐 MULTIPLAYER IS HERE!</p>
+        <p style="color: #fff; margin-bottom: 15px;">It's still in the works and it may be a bit laggy, and sadly, the servers that run on it are NOT 24/7 (we are working to find MUCH better servers), but they do last a VERY long time. In fact we would need over 5000 concurrent players on multiplayer mode to make it run out!</p>
+        
+        <p style="color: #fff; margin-bottom: 15px;">And also we are finally going to start making a LOT more updates. But not those tiny patches or shops, we're talking asset changes, whole revamps and more!</p>
+        
+        <p style="color: #00ff88; margin-bottom: 15px; font-weight: bold;">Happy slaying!</p>
+        
+        <p style="color: #888; margin-bottom: 15px; font-size: 14px; border-top: 1px solid rgba(0, 217, 255, 0.3); padding-top: 15px;"><strong>📊 Server Specs:</strong><br>
+        • RAM: 128MB (yes, we know it's sad, but it worked surprisingly well during testing!)<br>
+        • CPU: Shared 192-core AMD EPYC</p>
+      </div>
+      <button id="announcementOkBtn" style="font-size: 18px; padding: 12px 40px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #06150d; margin-top: 20px;">✨ Got it! ✨</button>
+    </div>
   </div>
   
   <div id="homeScreen" class="overlay">
     <div class="home-menu-container">
       <div class="dialog">
-        <h1>⚠️ CODE RED ⚠️</h1>
-        <p style="color: #00d9ff; margin-bottom: 5px;">v1.0.75</p>
-        <h2>SURVIVAL</h2>
-        <p style="color: #00d9ff; font-size: 16px;">Backrooms Edition</p>
-        
-        <h3 style="color: #00d9ff; margin-top: 25px; margin-bottom: 15px;">🎯 Select Difficulty</h3>
-        <div class="difficulty-buttons">
-          <button class="difficulty-btn" data-difficulty="Easy">😊 Easy</button>
-          <button class="difficulty-btn active" data-difficulty="Normal">😐 Normal</button>
-          <button class="difficulty-btn" data-difficulty="Hard">😰 Hard</button>
-          <button class="difficulty-btn" data-difficulty="Nightmare">💀 Nightmare</button>
-        </div>
-        
-        <div style="margin: 25px 0;">
-          <button id="startGameBtn" style="font-size: 18px; padding: 15px 40px;">🎮 START GAME</button>
-          <button id="tutorialBtn">📖 Tutorial</button>
-        </div>
-        
-        <div style="margin: 10px 0;">
-          <button id="multiplayerBtn">🌐 Multiplayer</button>
-          <button id="leaderboardBtn">🏆 Leaderboard</button>
-          <button id="customizeBtn">🎨 Customize</button>
-          <button id="upgradesBtn">⭐ Upgrades</button>
-          <button id="controlsBtn">⌨️ Controls</button>
-          <button id="promoBtn">🎟️ Promo Codes</button>
-          <button id="logoutBtn">🚪 Logout</button>
-        </div>
-        
-        <div class="stats-display">
-          <div class="stat-item">
-            <div class="stat-label">Best Wave</div>
-            <div class="stat-value" id="bestWaveHome">ZS0</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">Total Coins</div>
-            <div class="stat-value" id="totalCoinsHome" style="color: #ffdd00;">0</div>
-          </div>
-        </div>
-        
-        <div class="docs-section">
-          <h4>📚 DOCS</h4>
-          <p>You can view the changelog, about me and more at this link</p>
-          <a href="https://code-red-survival-docs.onrender.com/#" target="_blank" class="docs-link">View Documentation</a>
-        </div>
-        
-        <h3 style="position: absolute; bottom: 20px; left: 20px; color: #888; font-size: 16px; margin: 0;">Made by Shivank Mishra</h3>
-      </div>
+         <h1>⚠️ CODE RED ⚠️</h1>
+         <p style="color: #00d9ff; margin-bottom: 5px;">v1.1.0</p>
+         <h2>SURVIVAL</h2>
+         <p style="color: #00d9ff; font-size: 16px;">Backrooms Edition</p>
+         
+         <h3 style="color: #00d9ff; margin-top: 25px; margin-bottom: 15px;">🎯 Select Difficulty</h3>
+         <div class="difficulty-buttons">
+           <button class="difficulty-btn" data-difficulty="Easy">😊 Easy</button>
+           <button class="difficulty-btn active" data-difficulty="Normal">😐 Normal</button>
+           <button class="difficulty-btn" data-difficulty="Hard">😰 Hard</button>
+           <button class="difficulty-btn" data-difficulty="Nightmare">💀 Nightmare</button>
+         </div>
+         
+         <div style="margin: 25px 0;">
+           <button id="startGameBtn" style="font-size: 18px; padding: 15px 40px;">🎮 START GAME</button>
+           <button id="tutorialBtn">📖 Tutorial</button>
+         </div>
+         
+         <div style="margin: 10px 0;">
+           <button id="multiplayerBtn">🌐 Multiplayer</button>
+           <button id="leaderboardBtn">🏆 Leaderboard</button>
+           <button id="customizeBtn">🎨 Customize</button>
+           <button id="upgradesBtn">⭐ Upgrades</button>
+           <button id="controlsBtn">⌨️ Controls</button>
+           <button id="promoBtn">🎟️ Promo Codes</button>
+           <button id="logoutBtn">🚪 Logout</button>
+         </div>
+         
+         <div class="stats-display">
+           <div class="stat-item">
+             <div class="stat-label">Best Wave</div>
+             <div class="stat-value" id="bestWaveHome">ZS0</div>
+           </div>
+           <div class="stat-item">
+             <div class="stat-label">Total Coins</div>
+             <div class="stat-value" id="totalCoinsHome" style="color: #ffdd00;">0</div>
+           </div>
+         </div>
+         
+         <div class="docs-section">
+           <h4>📚 DOCS</h4>
+           <p>You can view the changelog, about me and more at this link</p>
+           <a href="https://code-red-survival-docs.onrender.com/#" target="_blank" class="docs-link">View Documentation</a>
+         </div>
+         
+         <h3 style="position: absolute; bottom: 20px; left: 20px; color: #888; font-size: 16px; margin: 0;">Made by Shivank Mishra</h3>
+       </div>
 
-      <div class="dialog discord-dialog">
-        <h2 style="margin-bottom: 10px;">DISCORD</h2>
-        <p style="color: #00d9ff; font-size: 18px; font-weight: bold; margin-bottom: 12px;">JOIN THE DISCORD SERVER AND GET 200 FREE RAINBOW GEMS</p>
-        <p style="font-size: 14px; color: #aaa; margin-bottom: 20px;">Click below to join the server.</p>
-        <button id="discordJoinBtn" style="width: 100%; padding: 14px; font-size: 16px; background: linear-gradient(135deg, #5865F2, #3b49df); color: #fff;">Join Discord Server</button>
-      </div>
+       <div class="dialog discord-dialog">
+         <h2 style="margin-bottom: 10px;">DISCORD</h2>
+         <p style="color: #00d9ff; font-size: 18px; font-weight: bold; margin-bottom: 12px;">JOIN THE DISCORD SERVER AND GET 200 FREE RAINBOW GEMS</p>
+         <p style="font-size: 14px; color: #aaa; margin-bottom: 20px;">Click below to join the server.</p>
+         <button id="discordJoinBtn" style="width: 100%; padding: 14px; font-size: 16px; background: linear-gradient(135deg, #5865F2, #3b49df); color: #fff;">Join Discord Server</button>
+       </div>
     </div>
   </div>
   
@@ -640,7 +690,7 @@
         <h3 style="color:#00d9ff;margin-bottom:10px;">Room Code</h3>
         <p style="color:#aaa;font-size:14px;margin-bottom:8px;">Share this code with your friend:</p>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-          <div id="lanJoinCode" style="flex:1;text-align:center;font-family:monospace;font-size:32px;letter-spacing:4px;color:#00ff88;background:#050505;border:1px solid #00ff88;border-radius:8px;padding:10px;">-------</div>
+          <div id="lanJoinCode" style="flex:1;text-align:center;font-family:monospace;font-size:32px;letter-spacing:4px;color:#00ff88;background:#050505;border:1px solid #00ff88;border-radius:8px[...]
           <button id="copyJoinCodeBtn" type="button" style="padding:12px;">Copy</button>
         </div>
         <p style="color:#aaa;font-size:13px;line-height:1.4;">The host device runs the world. Cloudflare only connects the players.</p>
@@ -648,13 +698,13 @@
       <div id="joinCodePanel" style="text-align:left;background:rgba(0,0,0,0.25);border:1px solid rgba(255,170,0,0.5);border-radius:8px;padding:14px;margin-bottom:16px;">
         <label for="joinCodeInput" style="display:block;color:#ffaa00;font-weight:bold;margin-bottom:8px;">Join with room code</label>
         <div style="display:flex;gap:8px;">
-          <input id="joinCodeInput" maxlength="7" placeholder="1A2B3C4" style="flex:1;text-transform:uppercase;letter-spacing:3px;text-align:center;padding:10px;background:#050505;border:1px solid #ffaa00;border-radius:6px;color:#fff;font-family:monospace;font-size:18px;">
+          <input id="joinCodeInput" maxlength="7" placeholder="1A2B3C4" style="flex:1;text-transform:uppercase;letter-spacing:3px;text-align:center;padding:10px;background:#050505;border:1px soli[...]
           <button id="joinCodeBtn" type="button" style="padding:10px 12px;background:linear-gradient(135deg,#ffaa00,#ff6600);color:#180900;">Go</button>
         </div>
       </div>
       <div id="multiplayerStatus" style="min-height:24px;color:#00d9ff;font-weight:bold;margin-bottom:14px;"></div>
       <div id="multiplayerPlayers" style="display:none;text-align:left;background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:16px;"></div>
-      <button id="startHostedGameBtn" style="display:none;width:100%;padding:14px;font-size:17px;margin-bottom:10px;background:linear-gradient(135deg,#00d9ff,#008cff);color:#00131f;">Start Hosted Match</button>
+      <button id="startHostedGameBtn" style="display:none;width:100%;padding:14px;font-size:17px;margin-bottom:10px;background:linear-gradient(135deg,#00d9ff,#008cff);color:#00131f;">Start Hosted[...]
       <button id="multiplayerBackBtn" style="width:100%;padding:12px;">Back to Menu</button>
     </div>
   </div>
@@ -673,7 +723,7 @@
           <li><strong>Shift</strong> - Sprint (40% faster movement)</li>
           <li><strong>P</strong> - Pause game</li>
         </ul>
-        
+         
         <h3>🎯 How to Play</h3>
         <ul>
           <li>Navigate through procedurally generated backrooms-style mazes</li>
@@ -684,7 +734,7 @@
           <li>Unlock new weapons and build your perfect loadout</li>
           <li>Boss waves appear every 10 waves - prepare for battle!</li>
         </ul>
-        
+         
         <h3>👾 Enemy Types</h3>
         <ul>
           <li><strong style="color: #ff3366;">Basic (Red)</strong> - Standard enemy, chases you directly</li>
@@ -693,7 +743,7 @@
           <li><strong style="color: #ff9900;">Suicide (Yellow)</strong> - Rushes you and explodes on contact (18 damage!)</li>
           <li><strong style="color: #aa0000;">Boss (Dark Red)</strong> - Appears every 10 waves, fires 6-way bullet spread</li>
         </ul>
-        
+         
         <h3>🔫 Weapons</h3>
         <ul>
           <li><strong>Pistol</strong> - 18 damage, 0.22s cooldown, accurate (unlocked by default)</li>
@@ -702,7 +752,7 @@
           <li><strong>Sniper</strong> - 75 damage, 0.9s cooldown, single shot (400 coins)</li>
           <li><strong>Railgun</strong> - ULTIMATE! Spins 8 lasers, infinite damage to all enemies, 60s cooldown (700 gems)</li>
         </ul>
-        
+         
         <h3>💎 Permanent Upgrades & Gems</h3>
         <ul>
           <li><strong>Red Gems</strong> - Premium currency dropped by enemies</li>
@@ -711,7 +761,7 @@
           <li><strong>Unlocked Weapons</strong> - Once purchased, weapons stay unlocked forever</li>
           <li><strong>Exchange Rate</strong> - Sell gems for coins or use gems for premium upgrades</li>
         </ul>
-        
+         
         <h3>💡 Pro Tips</h3>
         <ul>
           <li><strong>Use walls as cover</strong> - Ranged enemies can't shoot through walls</li>
@@ -770,14 +820,14 @@
         &nbsp;&nbsp;|&nbsp;&nbsp;
         Your Green Gems: <span id="shopGems" style="color: #00ff88; font-weight: bold; font-size: 24px;">0</span> 💎
       </p>
-      
+       
       <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 20px;">
         <div id="weaponsUpgradesShop" style="grid-column: 1 / -1; display: contents;"></div>
         <div id="offenseUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
         <div id="defenseUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
         <div id="utilityUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
       </div>
-      
+       
       <button id="shopCloseBtn" style="margin-top: 20px; font-size: 16px; padding: 10px 25px;">✖️ Close Shop</button>
     </div>
   </div>
@@ -788,7 +838,7 @@
       <p style="font-size: 16px; color: #ccc; margin-bottom: 20px;">
         Your Red Gems: <span id="customizeRedGems" style="color: #ff4444; font-weight: bold; font-size: 20px;">0</span> 🔴
       </p>
-      
+       
       <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 20px;">
         <div>
           <h3 style="color: #00ff88; margin-bottom: 15px;">Primary Colors (Free)</h3>
@@ -799,12 +849,12 @@
           <div id="secondaryColors" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>
         </div>
       </div>
-      
+       
       <div style="background: rgba(0,217,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: left;">
         <h3 style="color: #00d9ff; margin-bottom: 10px;">Preview</h3>
         <canvas id="colorPreview" width="100" height="100" style="background: rgba(0,0,0,0.3); border: 2px solid #00d9ff; border-radius: 8px;"></canvas>
       </div>
-      
+       
       <button id="customizeCloseBtn" style="margin-top: 20px; font-size: 16px; padding: 10px 25px;">✖️ Close</button>
     </div>
   </div>
@@ -818,14 +868,14 @@
         Your Rainbow Crystals: <span id="upgradesRainbowCrystals" style="color: #ff00ff; font-weight: bold; font-size: 22px;">0</span> 🌈
       </p>
       <p style="font-size: 14px; color: #aaa; margin-bottom: 20px;">These upgrades are PERMANENT and carry over to ALL future games!</p>
-      
+       
       <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 20px;">
         <div id="weaponsUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
         <div id="permanentDefenseUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
         <div id="permanentUtilityUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
         <div id="rainbowWeaponsUpgrades" style="grid-column: 1 / -1; display: contents;"></div>
       </div>
-      
+       
       <button id="upgradesCloseBtn" style="margin-top: 20px; font-size: 16px; padding: 10px 25px;">✖️ Close</button>
     </div>
   </div>
@@ -834,7 +884,7 @@
     <div class="dialog" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
       <h2>⌨️ Control Remapping</h2>
       <p style="font-size: 14px; color: #aaa; margin-bottom: 20px;">Click a button and press the key you want to use</p>
-      
+       
       <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
         <div>
           <label style="color: #00ff88; font-weight: bold; margin-bottom: 5px; display: block;">Move Up</label>
@@ -865,7 +915,7 @@
           <button id="remapSprint" style="width: 100%; padding: 10px; font-size: 16px;">Shift</button>
         </div>
       </div>
-      
+       
       <div style="display: flex; gap: 10px; margin-top: 20px;">
         <button id="resetControlsBtn" style="flex: 1; padding: 10px; font-size: 14px; background: #ff4444;">Reset to Defaults</button>
         <button id="controlsCloseBtn" style="flex: 1; padding: 10px; font-size: 14px;">✖️ Close</button>
@@ -895,10 +945,10 @@
       <h1>⚠️ CODE RED ⚠️</h1>
       <h2>SURVIVAL</h2>
       <p style="color: #00d9ff; font-size: 16px; margin-bottom: 30px;">Backrooms Edition</p>
-      
+       
       <h3 style="color: #00d9ff; margin-bottom: 20px;">🎮 Enter Your Name to Begin</h3>
       <p style="color: #aaa; font-size: 14px; margin-bottom: 20px;">Your name will be used for the global leaderboard</p>
-      
+       
       <input 
         type="text" 
         id="loginInput" 
@@ -918,7 +968,7 @@
           outline: none;
         "
       />
-      
+       
       <button 
         id="loginSubmitBtn" 
         style="font-size: 18px; padding: 15px 40px; width: 100%;"
@@ -949,6 +999,38 @@
 
   <script>
     (function() {
+      // Check if announcement has been seen
+      function checkAnnouncement() {
+        const announcementSeen = localStorage.getItem('crs_announcement_v1_1_0_seen');
+        if (!announcementSeen) {
+          showAnnouncement();
+        }
+      }
+
+      function showAnnouncement() {
+        const announcementScreen = document.getElementById('announcementScreen');
+        const homeScreen = document.getElementById('homeScreen');
+        if (announcementScreen) {
+          announcementScreen.style.display = 'flex';
+          if (homeScreen) homeScreen.style.display = 'none';
+        }
+      }
+
+      function hideAnnouncement() {
+        localStorage.setItem('crs_announcement_v1_1_0_seen', 'true');
+        const announcementScreen = document.getElementById('announcementScreen');
+        const homeScreen = document.getElementById('homeScreen');
+        if (announcementScreen) {
+          announcementScreen.style.display = 'none';
+        }
+        if (homeScreen) {
+          homeScreen.style.display = 'flex';
+        }
+      }
+
+      window.__checkAnnouncement = checkAnnouncement;
+      window.__hideAnnouncement = hideAnnouncement;
+
       function showMadeBySplash() {
         const madeBySplash = document.getElementById('madeBySplash');
         if (!madeBySplash) return;
@@ -971,6 +1053,15 @@
 
       window.addEventListener('load', () => {
         setTimeout(() => fadeOutMadeBySplash(), 800);
+
+        // Show announcement if not seen
+        checkAnnouncement();
+
+        // Announcement OK button
+        const announcementOkBtn = document.getElementById('announcementOkBtn');
+        if (announcementOkBtn) {
+          announcementOkBtn.addEventListener('click', hideAnnouncement);
+        }
 
         const discordJoinBtn = document.getElementById('discordJoinBtn');
         if (discordJoinBtn) {
