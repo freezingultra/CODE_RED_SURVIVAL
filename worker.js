@@ -120,15 +120,10 @@ export class MultiplayerRoom {
       return;
     }
 
-    if (message.type === "input" && client.role === "guest" && this.hostId) {
-      const host = this.clients.get(this.hostId);
-      if (host) this.send(host, { type: "guestInput", playerId: client.id, input: message.input || {} });
-      return;
-    }
-
-    if (message.type === "snapshot" && client.id === this.hostId) {
+    if (message.type === "snapshot" && this.clients.has(client.id)) {
+      // Peer simulation: relay each player's state to all other clients
       this.latestSnapshot = message.snapshot || null;
-      this.broadcast({ type: "snapshot", snapshot: this.latestSnapshot }, other => other.id !== this.hostId);
+      this.broadcast({ type: "snapshot", snapshot: this.latestSnapshot }, other => other.id !== client.id);
       return;
     }
 
