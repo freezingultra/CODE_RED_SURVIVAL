@@ -1393,10 +1393,10 @@
       this.multiplayerClient = null;
       this.networkId = null;
       this.remotePlayers = new Map();
-      this.remoteInputs = new Map();
-      this.networkSnapshotTimer = 0;
-      this.networkInputTimer = 0;
-      this.pendingSnapshot = null;
+      // Peer simulation: each client broadcasts only their own player state
+      this.networkStateTimer = 0;
+      // Seeded RNG for deterministic enemy spawning across all clients
+      this.spawnRng = Math.random;
     }
 
     generateMaze(seed = null) {
@@ -1459,10 +1459,13 @@
 
     resetMultiplayerWorld(seed) {
       this.generateMaze(seed);
+      // Seed spawn RNG so enemy positions are identical on every client
+      this.spawnRng = createSeededRandom(seed + 1);
       this.player.x = this.mapW * this.tileSize / 2;
       this.player.y = this.mapH * this.tileSize / 2;
       this.player.hp = this.player.maxHp;
       this.player.coins = 0;
+      this.player.gems = 0;
       this.player.gems = 0;
       this.player.kills = 0;
       this.player.magAmmo = this.player.weapons[this.player.weaponIndex].magSize || this.player.magAmmo;
@@ -1476,7 +1479,7 @@
       this.isRunning = false;
       this.paused = false;
       this.remotePlayers.clear();
-      this.remoteInputs.clear();
+      this.networkStateTimer = 0;
     }
 
     startHostedMultiplayer(client) {
@@ -1486,17 +1489,17 @@
       this.player.networkId = client.id;
       this.player.name = this.userName || "Host";
       this.resetMultiplayerWorld(client.seed || Date.now());
-      // Do NOT call startWave() here — the host waits in the lobby
-      // until they click "Start Hosted Match", which sends startMatch
-      // to the server which broadcasts matchStarted to everyone.
+      // Peer simulation: host runs its own full simulation, same as guests
     }
 
     startGuestMultiplayer(client) {
       this.multiplayerMode = "guest";
       this.multiplayerClient = client;
       this.networkId = client.id;
+      this.player.networkId = client.id;
+      this.player.name = this.userName || "Player";
       this.resetMultiplayerWorld(client.seed || Date.now());
-      // isRunning will be set to true by startWave() when the match begins
+      // Peer simulation: guest runs its own full simulation, same as host
     }
 
     addRemotePlayer(playerInfo) {
@@ -1513,12 +1516,10 @@
         }
       );
       this.remotePlayers.set(playerInfo.id, player);
-      this.remoteInputs.set(playerInfo.id, {});
     }
 
     removeRemotePlayer(playerId) {
       this.remotePlayers.delete(playerId);
-      this.remoteInputs.delete(playerId);
     }
 
     getLivingPlayers() {
@@ -1538,123 +1539,46 @@
       return nearest;
     }
 
-    createNetworkInput() {
-      const upgrades = PermanentUpgrades.load();
-      const controls = upgrades.controls || PermanentUpgrades.getDefaults().controls;
+    // Peer simulation: broadcast only this client's own player state
+    createPlayerState() {
       return {
-        up: !!Input.keys[controls.moveUp],
-        down: !!Input.keys[controls.moveDown],
-        left: !!Input.keys[controls.moveLeft],
-        right: !!Input.keys[controls.moveRight],
-        sprint: !!Input.keys[controls.sprint],
-        reload: !!Input.keys.r,
-        shoot: !!(Input.mouse.down || Input.keys[' ']),
-        aimX: Input.mouse.x + this.camera.x,
-        aimY: Input.mouse.y + this.camera.y,
-        weaponIndex: this.player.weaponIndex
+        id: this.networkId,
+        name: this.player.name,
+        x: this.player.x,
+        y: this.player.y,
+        hp: this.player.hp,
+        maxHp: this.player.maxHp,
+        kills: this.player.kills,
+        weaponIndex: this.player.weaponIndex,
+        color: this.player.color,
+        secondaryColor: this.player.secondaryColor,
+        wave: this.wave
       };
     }
 
-    playerSnapshot(player, role = "guest") {
-      return {
-        id: player.networkId,
-        name: player.name,
-        role,
-        x: player.x,
-        y: player.y,
-        hp: player.hp,
-        maxHp: player.maxHp,
-        coins: player.coins,
-        gems: player.gems,
-        redGems: player.redGems,
-        rainbowCrystals: player.rainbowCrystals,
-        kills: player.kills,
-        weaponIndex: player.weaponIndex,
-        magAmmo: player.magAmmo,
-        reloadTimer: player.reloadTimer,
-        color: player.color,
-        secondaryColor: player.secondaryColor
-      };
-    }
-
-    createNetworkSnapshot() {
-      return {
-        wave: this.wave,
-        isRunning: this.isRunning,
-        waveTimer: this.waveTimer,
-        waveTimeLimit: this.waveTimeLimit,
-        players: [
-          this.playerSnapshot(this.player, "host"),
-          ...[...this.remotePlayers.values()].map(player => this.playerSnapshot(player))
-        ],
-        enemies: this.enemies.map(enemy => ({
-          x: enemy.x,
-          y: enemy.y,
-          type: enemy.type,
-          hp: enemy.hp,
-          maxHp: enemy.maxHp,
-          speed: enemy.speed,
-          radius: enemy.radius
-        })),
-        bullets: this.bullets.map(bullet => ({
-          x: bullet.x,
-          y: bullet.y,
-          vx: bullet.vx,
-          vy: bullet.vy,
-          dmg: bullet.dmg,
-          owner: bullet.owner,
-          radius: bullet.radius,
-          travel: bullet.travel,
-          maxTravel: bullet.maxTravel,
-          isLaser: bullet.isLaser,
-          angle: bullet.angle,
-          lifetime: bullet.lifetime,
-          age: bullet.age,
-          sourceX: bullet.source ? bullet.source.x : bullet.sourceX,
-          sourceY: bullet.source ? bullet.source.y : bullet.sourceY
-        })),
-        loots: this.loots.map(loot => ({ ...loot }))
-      };
-    }
-
-    applyNetworkSnapshot(snapshot) {
-      if (!snapshot) return;
-      this.wave = snapshot.wave || 0;
-      this.isRunning = !!snapshot.isRunning;
-      this.waveTimer = snapshot.waveTimer || 0;
-      this.waveTimeLimit = snapshot.waveTimeLimit || this.waveTimeLimit;
-
-      const seenPlayers = new Set();
-      for (const playerData of snapshot.players || []) {
-        if (!playerData.id) continue;
-        seenPlayers.add(playerData.id);
-        const target = playerData.id === this.networkId
-          ? this.player
-          : this.remotePlayers.get(playerData.id) || new Player(playerData.x, playerData.y, {
-              name: playerData.name,
-              networkId: playerData.id,
-              color: playerData.color,
-              applyUpgrades: false
-            });
-        Object.assign(target, playerData);
-        if (playerData.id !== this.networkId) this.remotePlayers.set(playerData.id, target);
+    // Apply a remote player's broadcasted state to their avatar
+    applyRemotePlayerState(state) {
+      if (!state || !state.id || state.id === this.networkId) return;
+      let remote = this.remotePlayers.get(state.id);
+      if (!remote) {
+        remote = new Player(state.x, state.y, {
+          name: state.name || "Player",
+          networkId: state.id,
+          color: state.color || "#00ff88",
+          applyUpgrades: false
+        });
+        this.remotePlayers.set(state.id, remote);
       }
-
-      for (const playerId of [...this.remotePlayers.keys()]) {
-        if (!seenPlayers.has(playerId)) this.remotePlayers.delete(playerId);
-      }
-
-      this.enemies = (snapshot.enemies || []).map(data => Object.assign(Object.create(Enemy.prototype), {
-        x: data.x,
-        y: data.y,
-        type: data.type,
-        hp: data.hp,
-        maxHp: data.maxHp || data.hp,
-        speed: data.speed || 65,
-        radius: data.radius || (data.type === "boss" ? 28 : 11)
-      }));
-      this.bullets = (snapshot.bullets || []).map(data => ({ ...data }));
-      this.loots = (snapshot.loots || []).map(data => ({ ...data }));
+      // Smoothly interpolate position for rendering
+      remote.x = state.x;
+      remote.y = state.y;
+      remote.hp = state.hp;
+      remote.maxHp = state.maxHp || remote.maxHp;
+      remote.kills = state.kills || 0;
+      remote.weaponIndex = state.weaponIndex || 0;
+      remote.color = state.color || remote.color;
+      remote.secondaryColor = state.secondaryColor || remote.secondaryColor;
+      remote.name = state.name || remote.name;
     }
 
     // Working A* Pathfinding for Code Red: Survival
@@ -1847,12 +1771,15 @@ findPathAStar(startX, startY, endX, endY) {
 }
 
     spawnEnemy(type) {
-      const px = this.player.x, py = this.player.y;
+      const rng = this.spawnRng;
+      // Use seeded RNG so spawn positions are identical on all clients
+      const cx = this.mapW * this.tileSize / 2;
+      const cy = this.mapH * this.tileSize / 2;
       for (let attempts = 0; attempts < 20; attempts++) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = randRange(500, 800);
-        let x = px + Math.cos(angle) * dist;
-        let y = py + Math.sin(angle) * dist;
+        const angle = rng() * Math.PI * 2;
+        const dist = 500 + rng() * 300;
+        let x = cx + Math.cos(angle) * dist;
+        let y = cy + Math.sin(angle) * dist;
         x = clamp(x, 32, this.mapW * this.tileSize - 32);
         y = clamp(y, 32, this.mapH * this.tileSize - 32);
         
@@ -1861,7 +1788,7 @@ findPathAStar(startX, startY, endX, endY) {
           let hp, speed;
           
           if (type === "boss") {
-            hp = randRange(500, 2000);
+            hp = 500 + rng() * 1500;
             speed = 55 * mult.enemySpeed;
           } else {
             hp = (18 + this.wave * 2.5) * mult.enemyHpMult;
@@ -1902,7 +1829,8 @@ findPathAStar(startX, startY, endX, endY) {
         Log.info("Wave " + this.wave + ": Spawning " + enemyCount + " enemies initially");
         
         for (let i = 0; i < enemyCount; i++) {
-          const type = Math.random() < 0.5 ? "basic" : "ranged";
+          // Use seeded RNG so type selection is identical on all clients
+          const type = this.spawnRng() < 0.5 ? "basic" : "ranged";
           this.spawnEnemy(type);
         }
         
@@ -1970,23 +1898,13 @@ findPathAStar(startX, startY, endX, endY) {
     update(dt) {
       if (this.paused) return;
 
-      if (this.multiplayerMode === "guest") {
-        if (this.pendingSnapshot) {
-          this.applyNetworkSnapshot(this.pendingSnapshot);
-          this.pendingSnapshot = null;
+      // Peer simulation: broadcast own player state every ~50ms (both host and guest)
+      if (this.multiplayerMode !== "single" && this.multiplayerClient) {
+        this.networkStateTimer += dt;
+        if (this.networkStateTimer >= 1 / 20) {
+          this.networkStateTimer = 0;
+          this.multiplayerClient.sendSnapshot(this.createPlayerState());
         }
-        this.networkInputTimer += dt;
-        if (this.networkInputTimer >= 1 / 20 && this.multiplayerClient) {
-          this.networkInputTimer = 0;
-          this.multiplayerClient.sendInput(this.createNetworkInput());
-        }
-        const targetX = clamp(this.player.x - this.camera.w / 2, 0, this.mapW * this.tileSize - this.camera.w);
-        const targetY = clamp(this.player.y - this.camera.h / 2, 0, this.mapH * this.tileSize - this.camera.h);
-        this.camera.x += (targetX - this.camera.x) * 0.2;
-        this.camera.y += (targetY - this.camera.y) * 0.2;
-        this.updateHTMLHUD();
-        UI.updateHUD(this);
-        return;
       }
       
       if (!this.isLoggedIn) {
@@ -2028,11 +1946,7 @@ findPathAStar(startX, startY, endX, endY) {
       }
       
       this.player.update(dt, this);
-      if (this.multiplayerMode === "host") {
-        for (const [playerId, player] of this.remotePlayers) {
-          player.updateFromNetworkInput(dt, this, this.remoteInputs.get(playerId));
-        }
-      }
+      // Remote players are display-only in peer mode — their state comes via network
       
       for (let i = this.bullets.length - 1; i >= 0; i--) {
         const b = this.bullets[i];
@@ -2297,15 +2211,7 @@ findPathAStar(startX, startY, endX, endY) {
       this.camera.y += (targetY - this.camera.y) * 0.1;
       
       this.updateHTMLHUD();
-      
       UI.updateHUD(this);
-      if (this.multiplayerMode === "host" && this.multiplayerClient) {
-        this.networkSnapshotTimer += dt;
-        if (this.networkSnapshotTimer >= 1 / 10) {
-          this.networkSnapshotTimer = 0;
-          this.multiplayerClient.sendSnapshot(this.createNetworkSnapshot());
-        }
-      }
     }
     
     updateHTMLHUD() {
@@ -2985,9 +2891,11 @@ findPathAStar(startX, startY, endX, endY) {
         UI.showToast((data.player?.name || "A player") + " joined");
       });
       client.on("guestLeft", data => window.game.world.removeRemotePlayer(data.playerId));
-      client.on("guestInput", data => window.game.world.remoteInputs.set(data.playerId, data.input || {}));
+      // Peer simulation: snapshot now carries a single player's state, not the whole world
       client.on("snapshot", data => {
-        if (window.game.world.multiplayerMode === "guest") window.game.world.pendingSnapshot = data.snapshot;
+        if (data.snapshot && data.snapshot.id) {
+          window.game.world.applyRemotePlayerState(data.snapshot);
+        }
       });
       client.on("matchStarted", () => {
         const multiplayerScreen = document.getElementById("multiplayerScreen");
