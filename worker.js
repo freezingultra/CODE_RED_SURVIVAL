@@ -127,9 +127,10 @@ export class MultiplayerRoom {
       return;
     }
 
-    if (message.type === "startMatch" && client.id === this.hostId) {
+    if (message.type === "startMatch" && (client.id === this.hostId || this.clients.has(client.id))) {
       this.matchStarted = true;
       this.broadcast({ type: "matchStarted" });
+      return;
     }
   }
 
