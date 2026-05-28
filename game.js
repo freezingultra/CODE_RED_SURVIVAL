@@ -1393,10 +1393,10 @@
       this.multiplayerClient = null;
       this.networkId = null;
       this.remotePlayers = new Map();
-      // Peer simulation: each client broadcasts only their own player state
       this.networkStateTimer = 0;
-      // Seeded RNG for deterministic enemy spawning across all clients
       this.spawnRng = Math.random;
+      // Singleplayer: block wave start until player clicks "Start Game"
+      this.gameStarted = false;
     }
 
     generateMaze(seed = null) {
@@ -1916,8 +1916,16 @@ findPathAStar(startX, startY, endX, endY) {
         }
       }
       
-      if (!this.isRunning && Input.keys[' '] && this.multiplayerMode !== "guest") {
-        this.startWave();
+      if (!this.isRunning && Input.keys[' ']) {
+        if (this.multiplayerMode !== "single") {
+          // In multiplayer, any player pressing space triggers start for everyone
+          if (this.multiplayerClient) {
+            this.multiplayerClient.startMatch();
+          }
+        } else if (this.gameStarted) {
+          // In singleplayer, only allow if Start Game was clicked
+          this.startWave();
+        }
       }
 
       if (this.isRunning) {
@@ -2564,15 +2572,10 @@ findPathAStar(startX, startY, endX, endY) {
       if (startHostedGameBtn) {
         startHostedGameBtn.addEventListener("click", () => {
           if (window.game?.world?.multiplayerClient) {
+            // Send startMatch — the server broadcasts matchStarted to ALL clients
+            // including this one, so the wave starts uniformly for everyone
             window.game.world.multiplayerClient.startMatch();
-            // Start the wave for the host — guests get matchStarted via WebSocket
-            if (window.game.world.multiplayerMode === "host") {
-              window.game.world.startWave();
-            }
           }
-          this.hideAll();
-          const shopBtn = document.getElementById("shopButton");
-          if (shopBtn) shopBtn.style.display = "block";
         });
       }
 
@@ -2876,13 +2879,15 @@ findPathAStar(startX, startY, endX, endY) {
       });
       client.on("joinAccepted", data => {
         const status = document.getElementById("multiplayerStatus");
-        if (status) status.textContent = data.matchStarted ? "Joined match." : "Joined lobby. Waiting for host.";
+        if (status) status.textContent = data.matchStarted ? "Joined match." : "Joined lobby. Waiting for host to start.";
         window.game.world.startGuestMultiplayer(client);
-        if (data.snapshot) window.game.world.pendingSnapshot = data.snapshot;
-        // If the match is already in progress, start the wave right away
+        // If match already in progress, start immediately (no matchStarted event coming)
         if (data.matchStarted) {
           const multiplayerScreen = document.getElementById("multiplayerScreen");
           if (multiplayerScreen) multiplayerScreen.style.display = "none";
+          const shopBtn = document.getElementById("shopButton");
+          if (shopBtn) shopBtn.style.display = "block";
+          window.game.world.gameStarted = true;
           window.game.world.startWave();
         }
       });
@@ -2898,13 +2903,19 @@ findPathAStar(startX, startY, endX, endY) {
         }
       });
       client.on("matchStarted", () => {
+        // Hide multiplayer lobby and show game UI for everyone
         const multiplayerScreen = document.getElementById("multiplayerScreen");
         if (multiplayerScreen) multiplayerScreen.style.display = "none";
         const shopBtn = document.getElementById("shopButton");
         if (shopBtn) shopBtn.style.display = "block";
-        // Guests need to start their wave when the host launches the match
-        if (window.game?.world?.multiplayerMode === "guest") {
+        // Start wave for ALL players — host and guests alike
+        if (window.game?.world) {
+          window.game.world.gameStarted = true;
           window.game.world.startWave();
+          const mobileControls = document.getElementById('mobileControls');
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+                           window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+          if (mobileControls && isMobile) mobileControls.style.display = "block";
         }
       });
       client.on("hostClosed", () => {
@@ -3080,8 +3091,8 @@ findPathAStar(startX, startY, endX, endY) {
         const shopBtn = document.getElementById("shopButton");
         if (shopBtn) shopBtn.style.display = "block";
         if (window.game && window.game.world) {
+          window.game.world.gameStarted = true;
           window.game.world.startWave();
-          // Show mobile controls when game starts (if mobile device)
           const mobileControls = document.getElementById('mobileControls');
           const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
                           window.matchMedia('(hover: none) and (pointer: coarse)').matches;
@@ -3106,8 +3117,8 @@ findPathAStar(startX, startY, endX, endY) {
         const shopBtn = document.getElementById("shopButton");
         if (shopBtn) shopBtn.style.display = "block";
         if (window.game && window.game.world) {
+          window.game.world.gameStarted = true;
           window.game.world.startWave();
-          // Show mobile controls when game starts (if mobile device)
           const mobileControls = document.getElementById('mobileControls');
           const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
                           window.matchMedia('(hover: none) and (pointer: coarse)').matches;
