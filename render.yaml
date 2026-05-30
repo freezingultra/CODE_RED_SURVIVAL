@@ -1,6 +1,6 @@
 services:
   - type: static
     name: "CODE RED: SURVIVAL"
-    branch: main
+    branch: codered/code-red-survival
     root: /
     plan: free

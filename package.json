@@ -1,21 +1,13 @@
 {
-  "name": "code-red-survival-multiplayer",
+  "name": "code-red-survival",
   "version": "1.0.0",
-  "description": "Multiplayer server for Code Red: Survival game",
-  "main": "multiplayer_server.js",
+  "description": "Code Red: Survival browser game",
+  "main": "worker.js",
   "scripts": {
-    "start": "node multiplayer_server.js",
-    "dev": "nodemon multiplayer_server.js"
+    "deploy": "npx wrangler deploy --config wrangler.jsonc",
+    "preview": "npx wrangler dev --config wrangler.jsonc"
   },
-  "keywords": ["game", "multiplayer", "websocket"],
+  "keywords": ["game", "survival", "shooter"],
   "author": "Shivank Mishra",
-  "license": "UNLICENSED",
-  "dependencies": {
-    "express": "^4.18.2",
-    "ws": "^8.14.2",
-    "cors": "^2.8.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
-  }
+  "license": "UNLICENSED"
 }

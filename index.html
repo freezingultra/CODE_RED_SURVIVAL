@@ -590,7 +590,7 @@
         </div>
         
         <div style="margin: 10px 0;">
-          <button id="multiplayerBtn">🎮 Multiplayer</button>
+          <button id="multiplayerBtn">🌐 Multiplayer</button>
           <button id="leaderboardBtn">🏆 Leaderboard</button>
           <button id="customizeBtn">🎨 Customize</button>
           <button id="upgradesBtn">⭐ Upgrades</button>
@@ -625,6 +625,37 @@
         <p style="font-size: 14px; color: #aaa; margin-bottom: 20px;">Click below to join the server.</p>
         <button id="discordJoinBtn" style="width: 100%; padding: 14px; font-size: 16px; background: linear-gradient(135deg, #5865F2, #3b49df); color: #fff;">Join Discord Server</button>
       </div>
+    </div>
+  </div>
+  
+  <div id="multiplayerScreen" class="overlay" style="display: none;">
+    <div class="dialog" style="max-width: 760px;">
+      <h2>🌐 Multiplayer</h2>
+      <p style="color: #aaa; margin-bottom: 20px;">Host a room, share the 7-character code, and play from anywhere.</p>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px;">
+        <button id="hostGameBtn" style="padding: 14px; font-size: 16px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #06150d;">Host Game</button>
+        <button id="joinGameBtn" style="padding: 14px; font-size: 16px; background: linear-gradient(135deg, #ffaa00, #ff6600); color: #180900;">Join Room</button>
+      </div>
+      <div id="hostLinksPanel" style="display:none;text-align:left;background:rgba(0,0,0,0.35);border:1px solid rgba(0,217,255,0.45);border-radius:8px;padding:14px;margin-bottom:16px;">
+        <h3 style="color:#00d9ff;margin-bottom:10px;">Room Code</h3>
+        <p style="color:#aaa;font-size:14px;margin-bottom:8px;">Share this code with your friend:</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+          <div id="lanJoinCode" style="flex:1;text-align:center;font-family:monospace;font-size:32px;letter-spacing:4px;color:#00ff88;background:#050505;border:1px solid #00ff88;border-radius:8px;padding:10px;">-------</div>
+          <button id="copyJoinCodeBtn" type="button" style="padding:12px;">Copy</button>
+        </div>
+        <p style="color:#aaa;font-size:13px;line-height:1.4;">The host device runs the world. Cloudflare only connects the players.</p>
+      </div>
+      <div id="joinCodePanel" style="text-align:left;background:rgba(0,0,0,0.25);border:1px solid rgba(255,170,0,0.5);border-radius:8px;padding:14px;margin-bottom:16px;">
+        <label for="joinCodeInput" style="display:block;color:#ffaa00;font-weight:bold;margin-bottom:8px;">Join with room code</label>
+        <div style="display:flex;gap:8px;">
+          <input id="joinCodeInput" maxlength="7" placeholder="1A2B3C4" style="flex:1;text-transform:uppercase;letter-spacing:3px;text-align:center;padding:10px;background:#050505;border:1px solid #ffaa00;border-radius:6px;color:#fff;font-family:monospace;font-size:18px;">
+          <button id="joinCodeBtn" type="button" style="padding:10px 12px;background:linear-gradient(135deg,#ffaa00,#ff6600);color:#180900;">Go</button>
+        </div>
+      </div>
+      <div id="multiplayerStatus" style="min-height:24px;color:#00d9ff;font-weight:bold;margin-bottom:14px;"></div>
+      <div id="multiplayerPlayers" style="display:none;text-align:left;background:rgba(255,255,255,0.05);border-radius:8px;padding:12px;margin-bottom:16px;"></div>
+      <button id="startHostedGameBtn" style="display:none;width:100%;padding:14px;font-size:17px;margin-bottom:10px;background:linear-gradient(135deg,#00d9ff,#008cff);color:#00131f;">Start Hosted Match</button>
+      <button id="multiplayerBackBtn" style="width:100%;padding:12px;">Back to Menu</button>
     </div>
   </div>
   
@@ -857,112 +888,6 @@
     </div>
   </div>
 
-  <div id="multiplayerScreen" class="overlay" style="display: none;">
-    <div class="dialog" style="max-width: 600px;">
-      <h2>🌐 Global Multiplayer</h2>
-      <p style="color: #aaa; margin-bottom: 20px;">Play with friends on the same internet!</p>
-      
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-        <button id="createGameBtn" style="font-size: 16px; padding: 15px 20px; background: linear-gradient(135deg, #00ff88, #00cc66);">
-          ➕ Create Game
-        </button>
-        <button id="joinGameBtn" style="font-size: 16px; padding: 15px 20px; background: linear-gradient(135deg, #ffaa00, #ff6600);">
-          🔗 Join Game
-        </button>
-      </div>
-
-      <div id="createGamePanel" style="display: none; margin-bottom: 20px;">
-        <h3 style="color: #00d9ff; margin-bottom: 15px;">Create New Game</h3>
-        <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">Your game code will be generated automatically</p>
-        <button id="confirmCreateBtn" style="width: 100%; padding: 12px; font-size: 16px; margin-bottom: 10px;">
-          ✨ Create & Start Waiting
-        </button>
-        <div id="gameCodeDisplay" style="display: none; text-align: center; padding: 20px; background: rgba(0,217,255,0.1); border-radius: 8px; margin-bottom: 10px;">
-          <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">Your Game Code:</p>
-          <p id="gameCode" style="color: #00d9ff; font-size: 36px; font-weight: bold; font-family: monospace; letter-spacing: 5px; margin: 0;">----</p>
-          <p style="color: #888; font-size: 12px; margin-top: 10px;">Share this code with your friend!</p>
-        </div>
-      </div>
-
-      <div id="joinGamePanel" style="display: none; margin-bottom: 20px;">
-        <h3 style="color: #00d9ff; margin-bottom: 15px;">Join Existing Game</h3>
-        <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">Enter the 4-letter code from your friend</p>
-        <input 
-          id="joinCodeInput" 
-          type="text" 
-          placeholder="e.g., AB12" 
-          maxlength="4"
-          style="
-            width: 100%;
-            padding: 12px;
-            font-size: 18px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 2px solid #00d9ff;
-            border-radius: 8px;
-            color: #fff;
-            text-align: center;
-            letter-spacing: 3px;
-            font-family: monospace;
-            font-weight: bold;
-            margin-bottom: 10px;
-            box-shadow: 0 0 15px rgba(0, 217, 255, 0.3);
-            outline: none;
-          "
-        />
-        <button id="confirmJoinBtn" style="width: 100%; padding: 12px; font-size: 16px;">
-          🎮 Join Game
-        </button>
-      </div>
-
-      <div id="waitingPanel" style="display: none; text-align: center; padding: 20px;">
-        <h3 style="color: #00d9ff; margin-bottom: 15px;">🎮 Lobby</h3>
-        <p id="waitingCode" style="color: #00d9ff; font-size: 28px; font-weight: bold; font-family: monospace; margin-bottom: 20px; letter-spacing: 3px;">----</p>
-        
-        <div id="playerList" style="margin: 20px 0; text-align: left;">
-          <h4 style="color: #aaa; margin-bottom: 10px;">Players (<span id="playerCount">1</span>/6):</h4>
-          <div id="players" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px;">
-            <!-- Players will be listed here -->
-          </div>
-        </div>
-        
-        <div id="hostControls" style="display: none; margin-top: 20px;">
-          <button id="startGameBtn" style="width: 100%; padding: 15px; font-size: 18px; background: linear-gradient(135deg, #00ff88, #00cc66); font-weight: bold; cursor: pointer; opacity: 1; position: relative; z-index: 1000; pointer-events: auto !important;" onclick="
-  // Test if the button exists and can be clicked
-  const btn = document.getElementById('startGameBtn');
-  console.log('Button exists:', !!btn);
-  console.log('Button disabled:', btn?.disabled);
-  console.log('Button onclick:', btn?.onclick);
-  // Trigger the actual handler
-  if (btn && btn._clickHandler) {
-    btn._clickHandler(new Event('click'));
-  }
-">
-            🚀 Start Game
-          </button>
-          <p style="color: #888; font-size: 12px; margin-top: 10px;">You need at least 1 player to start</p>
-        </div>
-        
-        <div id="guestControls" style="display: none; margin-top: 20px;">
-          <p style="color: #ffa500; font-size: 14px;">⏳ Waiting for host to start the game...</p>
-        </div>
-        
-        <button id="cancelWaitBtn" style="width: 100%; padding: 12px; font-size: 16px; background: #ff3366; margin-top: 15px;">
-          ✖️ Leave Lobby
-        </button>
-      </div>
-
-      <div style="margin-top: 20px;">
-        <button id="multiplayerCloseBtn" style="width: 100%; padding: 12px; font-size: 16px;">← Back to Menu</button>
-      </div>
-    </div>
-  </div>
-
-  <style>
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
-
   <div id="toast" class="toast"></div>
   
   <div id="loginScreen" class="overlay" style="display: flex;">
@@ -1058,13 +983,172 @@
     })();
   </script>
 
+  <!-- Update notice modal v1.1.56 -->
+  <div id="updateModal" style="
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(0,0,0,0.88);
+    backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+  ">
+    <div style="
+      background: linear-gradient(160deg, #0d1a2a 0%, #0a0f1a 100%);
+      border: 1px solid rgba(0,217,255,0.35);
+      border-radius: 16px;
+      max-width: 640px;
+      width: calc(100% - 32px);
+      padding: 32px 28px 24px;
+      box-shadow: 0 0 60px rgba(0,217,255,0.12), 0 24px 48px rgba(0,0,0,0.7);
+      max-height: 90vh;
+      overflow-y: auto;
+    ">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;">
+        <span style="font-size:26px;">🔴</span>
+        <h2 style="font-family:monospace;font-size:20px;color:#00d9ff;margin:0;letter-spacing:1px;">CODE RED: SURVIVAL — UPDATE v1.1.56</h2>
+      </div>
+      <p style="color:#888;font-size:12px;font-family:monospace;margin:0 0 18px;">Upgrading from v1.0.75 — May 2026</p>
+
+      <!-- Apology -->
+      <div style="background:rgba(255,100,68,0.08);border-left:3px solid #ff6644;border-radius:6px;padding:12px 14px;margin-bottom:20px;">
+        <p style="color:#ffccbb;font-size:13px;line-height:1.7;margin:0;">
+          <strong style="color:#ff8866;">A sincere apology first.</strong> It's been over <strong>6 months</strong> since the last update. Thank you for sticking around — this is the biggest update Code Red has ever received. 56 new features, all at once. 🙏
+        </p>
+      </div>
+
+      <!-- Feature sections -->
+      <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:22px;">
+
+        <div style="background:rgba(0,217,255,0.05);border:1px solid rgba(0,217,255,0.15);border-radius:8px;padding:12px 14px;">
+          <p style="color:#00d9ff;font-weight:bold;font-size:13px;margin-bottom:8px;">⚔️ COMBAT & PLAYER MECHANICS</p>
+          <ul style="color:#aaa;font-size:12px;line-height:1.9;margin:0;padding-left:18px;">
+            <li><strong style="color:#fff">Stamina Bar</strong> — Drains when sprinting or dashing. Shown below your character and in the HUD.</li>
+            <li><strong style="color:#fff">Ghost Dash</strong> — Press <kbd>E</kbd> to teleport a short distance with invincibility frames. Costs 30 stamina, 2.5s cooldown.</li>
+            <li><strong style="color:#fff">Active Reload</strong> — Press <kbd>R</kbd> while the green ring pulses for an instant reload + 20% damage boost.</li>
+            <li><strong style="color:#fff">Melee Bash</strong> — Press <kbd>Q</kbd> to knock back and damage nearby enemies instantly.</li>
+            <li><strong style="color:#fff">Dual Wielding</strong> — Unlockable via the Upgrades shop for pistols/SMGs.</li>
+            <li><strong style="color:#fff">Crouch</strong> — Hold <kbd>C</kbd> to move slower but dramatically improve accuracy.</li>
+            <li><strong style="color:#fff">Skill Trees</strong> — New Survivor Points in the Upgrades menu for HP, Speed, and Reload.</li>
+            <li><strong style="color:#fff">Passive Regen</strong> — Late-game upgrade that heals 1 HP every 10 seconds automatically.</li>
+            <li><strong style="color:#fff">Armor Plates</strong> — Secondary protection bar that reduces incoming damage.</li>
+            <li><strong style="color:#fff">Ledge Mantling</strong> — You automatically nudge out of walls if you get clipped — no more getting stuck.</li>
+          </ul>
+        </div>
+
+        <div style="background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.15);border-radius:8px;padding:12px 14px;">
+          <p style="color:#00ff88;font-weight:bold;font-size:13px;margin-bottom:8px;">🔫 WEAPONS & EQUIPMENT</p>
+          <ul style="color:#aaa;font-size:12px;line-height:1.9;margin:0;padding-left:18px;">
+            <li><strong style="color:#fff">Crossbow</strong> — Silent, high-damage bolt. Buy in Shop.</li>
+            <li><strong style="color:#fff">Grenade Launcher</strong> — Explodes on impact with splash damage. Buy in Shop.</li>
+            <li><strong style="color:#fff">Laser Sight</strong> — Red dot aim line drawn to your cursor. Buy in Shop.</li>
+            <li><strong style="color:#fff">Homing Missiles</strong> — Press <kbd>M</kbd> to fire. Locks on to the nearest enemy. Buy in Shop.</li>
+            <li><strong style="color:#fff">Chainsaw</strong> — Continuous melee damage while firing. Uses fuel (ammo). Buy in Shop.</li>
+            <li><strong style="color:#fff">Shock Traps</strong> — Press <kbd>T</kbd> to deploy. Stuns and damages enemies in range. Buy in Shop.</li>
+            <li><strong style="color:#fff">Sentry Turret</strong> — Press <kbd>Y</kbd> to deploy. Auto-fires at nearby enemies. Buy in Shop.</li>
+            <li><strong style="color:#fff">Medical Kit</strong> — Press <kbd>H</kbd> to deploy. Heals you and nearby teammates. Buy in Shop.</li>
+            <li><strong style="color:#fff">Ammo Satchel</strong> — Increases all magazine sizes by 50%. Buy in Shop.</li>
+          </ul>
+        </div>
+
+        <div style="background:rgba(255,50,100,0.05);border:1px solid rgba(255,50,100,0.15);border-radius:8px;padding:12px 14px;">
+          <p style="color:#ff6688;font-weight:bold;font-size:13px;margin-bottom:8px;">👾 NEW ENEMIES</p>
+          <ul style="color:#aaa;font-size:12px;line-height:1.9;margin:0;padding-left:18px;">
+            <li><strong style="color:#fff">The Mimic</strong> — Disguises as a gem or coin. Reveals itself when you get too close.</li>
+            <li><strong style="color:#fff">Tank Entity</strong> — Huge HP, slow speed. Blocks smaller enemies.</li>
+            <li><strong style="color:#fff">Teleporter</strong> — Blinks behind you every few seconds.</li>
+            <li><strong style="color:#fff">Splitting Slimes</strong> — Splits into two faster mini-slimes when killed.</li>
+            <li><strong style="color:#fff">Suicide Bombers</strong> — Glow and explode on contact for massive damage.</li>
+            <li><strong style="color:#fff">The Hunter</strong> — Invisible until within 130px. Spawns every 15 boss waves.</li>
+            <li><strong style="color:#fff">Shielded Entities</strong> — Only take damage from behind. Front shots are blocked.</li>
+            <li><strong style="color:#fff">Toxic Crawlers</strong> — Leave acid pools that damage you if stepped in.</li>
+            <li><strong style="color:#fff">Elite Variants</strong> — Golden glowing versions with 2× HP and 1.3× speed. 10% chance on Wave 5+.</li>
+          </ul>
+        </div>
+
+        <div style="background:rgba(255,170,0,0.05);border:1px solid rgba(255,170,0,0.15);border-radius:8px;padding:12px 14px;">
+          <p style="color:#ffaa00;font-weight:bold;font-size:13px;margin-bottom:8px;">🗺️ ENVIRONMENT & WORLD</p>
+          <ul style="color:#aaa;font-size:12px;line-height:1.9;margin:0;padding-left:18px;">
+            <li><strong style="color:#fff">Breakable Walls</strong> — Grenade Launcher can blast through certain walls to create new paths.</li>
+            <li><strong style="color:#fff">Vending Machines</strong> — Appear in the world. Spend coins for a random buff.</li>
+            <li><strong style="color:#fff">Environmental Traps</strong> — Acid pools and shock zones placed throughout the maze.</li>
+            <li><strong style="color:#fff">Keycard System</strong> — Find keycards to unlock high-tier loot rooms.</li>
+            <li><strong style="color:#fff">Day/Night Cycle</strong> — Every 5 waves the map gets darker. A spotlight follows you. Enemies get tougher at night. 🌙</li>
+            <li><strong style="color:#fff">Secret Rooms</strong> — Walls with a subtle visual glitch that can be walked through for hidden loot.</li>
+            <li><strong style="color:#fff">Toxic Gas Zones</strong> — Hazardous areas that deal damage without a Gas Mask item.</li>
+            <li><strong style="color:#fff">Escalating Hazards</strong> — After Wave 20, rising water begins flooding the map, dealing continuous damage.</li>
+          </ul>
+        </div>
+
+        <div style="background:rgba(150,100,255,0.05);border:1px solid rgba(150,100,255,0.15);border-radius:8px;padding:12px 14px;">
+          <p style="color:#bb88ff;font-weight:bold;font-size:13px;margin-bottom:8px;">💎 ECONOMY & PROGRESSION</p>
+          <ul style="color:#aaa;font-size:12px;line-height:1.9;margin:0;padding-left:18px;">
+            <li><strong style="color:#fff">Daily Challenges</strong> — 3 new challenges every day. Complete them for Rainbow Crystals.</li>
+            <li><strong style="color:#fff">Bounty System</strong> — A random enemy is marked each wave with a ★. Kill it for +50 bonus coins.</li>
+            <li><strong style="color:#fff">Investment Bank</strong> — Deposit coins in the Shop. Earns 5% interest every wave you survive.</li>
+          </ul>
+        </div>
+
+        <div style="background:rgba(0,217,255,0.05);border:1px solid rgba(0,217,255,0.15);border-radius:8px;padding:12px 14px;">
+          <p style="color:#00d9ff;font-weight:bold;font-size:13px;margin-bottom:8px;">👥 MULTIPLAYER & SOCIAL</p>
+          <ul style="color:#aaa;font-size:12px;line-height:1.9;margin:0;padding-left:18px;">
+            <li><strong style="color:#fff">Revive System</strong> — In multiplayer, reaching 0 HP puts you Down instead of dying. A teammate nearby auto-revives you within 10 seconds.</li>
+            <li><strong style="color:#fff">Trading</strong> — Drop items and deployables for teammates via the Shop.</li>
+            <li><strong style="color:#fff">Emote Wheel</strong> — Press <kbd>G</kbd> to open. Send Hi, Thanks, Follow Me, or Help to teammates.</li>
+            <li><strong style="color:#fff">Global Leaderboards</strong> — See the top survivors worldwide.</li>
+            <li><strong style="color:#fff">Co-op Finishers</strong> — Killing a boss in multiplayer triggers a special golden particle burst and screen shake.</li>
+            <li><strong style="color:#fff">No-Walls Mode</strong> — Open arena with an extremely fast enemy spawn rate (1 per 0.1 second).</li>
+            <li><strong style="color:#fff">PvP Mode</strong> — Players can damage each other using weapons from the Upgrades shop.</li>
+            <li><strong style="color:#fff">Shop Disabled in Multiplayer</strong> — The Shop (F) shows a message redirecting you to Upgrades instead.</li>
+            <li><strong style="color:#fff">Peer Simulation</strong> — Each player now runs their own physics locally. No more host lag. Enemies spawn identically on all screens via a shared seed.</li>
+            <li><strong style="color:#fff">Anyone Can Start</strong> — Any player in the lobby can press Space or click Start to begin the match.</li>
+          </ul>
+        </div>
+
+        <div style="background:rgba(255,255,100,0.05);border:1px solid rgba(255,255,100,0.15);border-radius:8px;padding:12px 14px;">
+          <p style="color:#ffff88;font-weight:bold;font-size:13px;margin-bottom:8px;">📽️ VISUALS & QUALITY OF LIFE</p>
+          <ul style="color:#aaa;font-size:12px;line-height:1.9;margin:0;padding-left:18px;">
+            <li><strong style="color:#fff">Screen Shake</strong> — Explosions, boss kills, and heavy hits shake the camera.</li>
+            <li><strong style="color:#fff">Dynamic Blood</strong> — Red stains appear and slowly fade where enemies die.</li>
+            <li><strong style="color:#fff">Detailed Statistics</strong> — Game Over screen now shows accuracy, damage dealt, and damage taken.</li>
+            <li><strong style="color:#fff">Singleplayer Start Gate</strong> — The game no longer auto-starts. Press Start Game or Space after clicking the button.</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <p style="color:#555;font-size:11px;font-family:monospace;margin-bottom:14px;text-align:center;">This message won't appear again on this device.</p>
+
+      <button id="updateModalOkBtn" style="
+        width:100%;padding:14px;font-size:15px;font-family:monospace;font-weight:bold;
+        letter-spacing:2px;background:linear-gradient(135deg,#00d9ff,#0099cc);
+        color:#001a22;border:none;border-radius:8px;cursor:pointer;transition:opacity 0.2s;
+      " onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+        GOT IT — LET'S PLAY v1.1.56
+      </button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var STORAGE_KEY = "codered-update-v1.1.56-seen";
+      var modal = document.getElementById("updateModal");
+      var btn = document.getElementById("updateModalOkBtn");
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        modal.style.display = "flex";
+      }
+      btn.addEventListener("click", function () {
+        localStorage.setItem(STORAGE_KEY, "1");
+        modal.style.display = "none";
+      });
+    })();
+  </script>
+
   <!-- Supabase Client Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="promo_codes.js"></script>
-  <script src="multiplayer.config.js"></script>
-  <script src="local_lobby.js"></script>
   <script src="multiplayer_client.js"></script>
-  <script src="multiplayer_shop.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

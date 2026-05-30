@@ -237,10 +237,10 @@ window.PROMO_CODES = [
     "redGems": 40
   },
   {
-    "code": "ULTIMATE2025",
+    "code": "WE_ARE_VERY_SORRY",
     "rainbow": 2500,
     "redGems": 2500,
-    "note": "Ultimate reward"
+    "note": "Sorry"
   },
   {
     "code": "GODMODE",

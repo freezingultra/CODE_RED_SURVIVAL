@@ -1,342 +1,163 @@
-// Multiplayer Client for Code Red: Survival
-// Handles WebSocket communication and game synchronization
+(function() {
+  "use strict";
 
-// Use the existing MULTIPLAYER_CONFIG from multiplayer.config.js
-const config = typeof MULTIPLAYER_CONFIG !== 'undefined' ? MULTIPLAYER_CONFIG : {
-  // Fallback config if not defined
-  // NOTE: This should match your Render multiplayer server subdomain
-  SERVER_URL: 'wss://multiplayer-for-code-red.onrender.com'
-};
+  const ROOM_CODE_PATTERN = /^[0-9A-Z]{7}$/;
+  const ROOM_CODE_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-// Debug: Log what config we're using
-console.log('[MultiplayerClient] Config loaded:', config);
-
-class MultiplayerClient {
-  constructor(serverUrl = null) {
-    this.serverUrl = serverUrl || this.getServerUrl();
-    this.ws = null;
-    this.gameCode = null;
-    this.playerId = null;
-    this.playerName = null;
-    this.playerColor = null;
-    this.mapSeed = null;
-    this.isConnected = false;
-    this.reconnectAttempts = 0;
-    this.eventListeners = {};
-    this.pendingMessages = [];
-    this.playerColor = this.getRandomColor();
-  }
-
-  getServerUrl() {
-    // Use the config's SERVER_URL if available, otherwise fallback to auto-detect
-    if (config.SERVER_URL) {
-      return config.SERVER_URL;
+  function generateRoomCode() {
+    const bytes = new Uint8Array(7);
+    crypto.getRandomValues(bytes);
+    let code = "";
+    for (const byte of bytes) {
+      code += ROOM_CODE_ALPHABET[byte % ROOM_CODE_ALPHABET.length];
     }
-    
-    // Auto-detect based on current page
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    return `${protocol}//${host}`;
+    return code;
   }
 
-  getApiUrl() {
-    // Convert WebSocket URL to HTTP URL
-    return this.serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+  function cleanRoomCode(code) {
+    return String(code || "").trim().toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 7);
   }
 
-  getRandomColor() {
-    const colors = ['#00d9ff', '#00ff88', '#ff6b6b', '#ff9f43', '#5f27cd', '#1dd1a1'];
-    return colors[Math.floor(Math.random() * colors.length)];
-  }
-
-  on(event, callback) {
-    if (!this.eventListeners[event]) {
-      this.eventListeners[event] = [];
+  class MultiplayerClient {
+    constructor(options = {}) {
+      this.socket = null;
+      this.id = null;
+      this.seed = null;
+      this.role = null;
+      this.roomCode = cleanRoomCode(options.roomCode || "");
+      this.handlers = new Map();
+      this.connected = false;
     }
-    this.eventListeners[event].push(callback);
-  }
 
-  emit(event, data) {
-    if (this.eventListeners[event]) {
-      this.eventListeners[event].forEach(callback => callback(data));
-    }
-  }
-
-  async connect(gameCode, playerName) {
-    try {
-      this.gameCode = gameCode.toUpperCase();
-      this.playerName = playerName;
-
-      // Connect WebSocket
-      this.ws = new WebSocket(this.serverUrl);
-
-      this.ws.onopen = () => {
-        console.log('[Multiplayer] WebSocket connected');
-        this.isConnected = true;
-        this.reconnectAttempts = 0;
-
-        // Send join message
-        this.ws.send(JSON.stringify({
-          type: 'join',
-          code: this.gameCode,
-          playerName: this.playerName
-        }));
+    on(type, handler) {
+      if (!this.handlers.has(type)) this.handlers.set(type, []);
+      this.handlers.get(type).push(handler);
+      return () => {
+        const handlers = this.handlers.get(type) || [];
+        this.handlers.set(type, handlers.filter(item => item !== handler));
       };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.handleMessage(data);
-        } catch (error) {
-          console.error('[Multiplayer] Failed to parse message:', error);
-        }
-      };
-
-      this.ws.onclose = () => {
-        console.log('[Multiplayer] WebSocket disconnected');
-        this.isConnected = false;
-        this.emit('disconnected');
-        
-        // Attempt reconnection
-        if (this.reconnectAttempts < 3) {
-          this.reconnectAttempts++;
-          setTimeout(() => {
-            console.log(`[Multiplayer] Reconnection attempt ${this.reconnectAttempts}`);
-            this.connect(this.gameCode, this.playerName);
-          }, 3000);
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error('[Multiplayer] WebSocket error:', error);
-        this.emit('error', { message: 'Connection error' });
-      };
-
-    } catch (error) {
-      console.error('[Multiplayer] Connection failed:', error);
-      throw error;
     }
-  }
 
-  handleMessage(data) {
-    switch (data.type) {
-      case 'joined':
-        this.playerId = data.playerId;
-        this.playerColor = data.playerColor;
-        this.mapSeed = data.mapSeed;
-        this.emit('joined', data);
-        break;
-      
-      case 'player_joined':
-        this.emit('player_joined', data);
-        break;
-      
-      case 'player_update':
-        this.emit('player_update', data);
-        break;
-      
-      case 'player_left':
-        this.emit('player_left');
-        break;
-      
-      case 'game_state':
-        this.emit('game_state', data);
-        break;
-      
-      case 'error':
-        this.emit('error', data);
-        break;
-      
-      default:
-        console.log('[Multiplayer] Unknown message type:', data.type);
+    emit(type, payload) {
+      for (const handler of this.handlers.get(type) || []) {
+        handler(payload);
+      }
     }
-  }
 
-  sendPlayerUpdate(x, y, hp, weaponIndex) {
-    if (this.isConnected && this.ws) {
-      this.ws.send(JSON.stringify({
-        type: 'player_update',
-        x,
-        y,
-        hp,
-        weaponIndex
-      }));
-    }
-  }
+    connect() {
+      if (this.socket && this.connected) return Promise.resolve();
+      if (!ROOM_CODE_PATTERN.test(this.roomCode)) {
+        return Promise.reject(new Error("Enter a 7-character room code."));
+      }
 
-  sendGameAction(action, data) {
-    if (this.isConnected && this.ws) {
-      this.ws.send(JSON.stringify({
-        type: 'game_action',
-        action,
-        data
-      }));
-    }
-  }
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const url = `${protocol}//${window.location.host}/multiplayer?room=${encodeURIComponent(this.roomCode)}`;
 
-  disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-    this.isConnected = false;
-  }
-}
-
-class MultiplayerAPI {
-  constructor(serverUrl = null) {
-    // Always use the configured server URL if available
-    if (config.SERVER_URL && config.SERVER_URL.trim() !== '') {
-      this.baseUrl = config.SERVER_URL.replace('ws://', 'http://').replace('wss://', 'https://');
-      console.log(`[MultiplayerAPI] Using configured server: ${this.baseUrl}`);
-    } else if (serverUrl) {
-      this.baseUrl = serverUrl.replace('ws://', 'http://').replace('wss://', 'https://');
-      console.log(`[MultiplayerAPI] Using provided server: ${this.baseUrl}`);
-    } else {
-      // Auto-detect based on current page (same logic as MultiplayerClient)
-      const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-      const host = window.location.host;
-      this.baseUrl = `${protocol}//${host}`;
-      console.log(`[MultiplayerAPI] Auto-detected server: ${this.baseUrl}`);
-    }
-  }
-
-  async createGame(playerName, mapSeed = null) {
-    try {
-      console.log(`[MultiplayerAPI] Creating game at: ${this.baseUrl}/api/games`);
-      
-      const response = await fetch(`${this.baseUrl}/api/games`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          playerName,
-          mapSeed: mapSeed || Math.floor(Math.random() * 1000000)
-        })
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        this.socket = new WebSocket(url);
+        this.socket.addEventListener("open", () => {
+          this.connected = true;
+          settled = true;
+          resolve();
+        }, { once: true });
+        this.socket.addEventListener("error", () => {
+          if (!settled) reject(new Error("Could not connect to the multiplayer server."));
+        }, { once: true });
+        this.socket.addEventListener("close", () => {
+          this.connected = false;
+          this.emit("closed");
+        });
+        this.socket.addEventListener("message", event => this.handleMessage(event));
       });
+    }
 
-      console.log(`[MultiplayerAPI] Response status: ${response.status}`);
-      console.log(`[MultiplayerAPI] Response headers:`, response.headers);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[MultiplayerAPI] Error response: ${errorText}`);
-        throw new Error(`Server error: ${response.status} - ${errorText}`);
-      }
-
-      const responseText = await response.text();
-      console.log(`[MultiplayerAPI] Response text: ${responseText}`);
-      
-      if (!responseText) {
-        throw new Error('Server returned empty response. Is the multiplayer server running?');
-      }
-
-      let result;
+    handleMessage(event) {
+      let message;
       try {
-        result = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error(`[MultiplayerAPI] Failed to parse JSON: ${parseError}`);
-        throw new Error(`Invalid server response: ${responseText}`);
+        message = JSON.parse(event.data);
+      } catch {
+        return;
       }
 
-      return {
-        code: result.code,
-        mapSeed: result.mapSeed
-      };
-    } catch (error) {
-      console.error('Failed to create game:', error);
-      throw error;
+      if (message.id) this.id = message.id;
+      if (message.seed) this.seed = message.seed;
+      if (message.roomCode || message.joinCode) this.roomCode = message.roomCode || message.joinCode;
+      if (message.type === "hostAccepted") this.role = "host";
+      if (message.type === "joinAccepted") this.role = "guest";
+      this.emit(message.type, message);
     }
-  }
 
-  async joinGame(code, playerName) {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/games/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          code: code.toUpperCase(), 
-          playerName 
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to join game');
+    send(message) {
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        this.socket.send(JSON.stringify(message));
       }
-
-      const result = await response.json();
-      return {
-        code: result.code,
-        mapSeed: result.mapSeed,
-        creatorName: result.creatorName,
-        playerCount: result.playerCount
-      };
-    } catch (error) {
-      console.error('Failed to join game:', error);
-      // Provide more helpful error messages
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        const displayUrl = (config.SERVER_URL && config.SERVER_URL.trim() !== '')
-          ? config.SERVER_URL
-          : this.baseUrl;
-        throw new Error(`Cannot connect to multiplayer server at ${displayUrl}. Please check if the server is running and accessible.`);
-      }
-      throw error;
     }
-  }
 
-  async getGameInfo(code) {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/games/${code.toUpperCase()}`);
+    waitFor(types, timeoutMs = 8000) {
+      return new Promise((resolve, reject) => {
+        const removers = [];
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error("Multiplayer server did not respond."));
+        }, timeoutMs);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to get game info');
-      }
+        const cleanup = () => {
+          clearTimeout(timer);
+          for (const remove of removers) remove();
+        };
 
-      return await response.json();
-    } catch (error) {
-      console.error('Failed to get game info:', error);
-      throw error;
-    }
-  }
-
-  async startGame(code) {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/games/${code.toUpperCase()}/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        for (const type of types) {
+          const remove = this.on(type, payload => {
+            cleanup();
+            if (type === "error") {
+              reject(new Error(payload?.message || "Multiplayer error."));
+            } else {
+              resolve(payload);
+            }
+          });
+          removers.push(remove);
         }
       });
+    }
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to start game');
+    async hostGame(details) {
+      this.roomCode = generateRoomCode();
+      await this.connect();
+      const accepted = this.waitFor(["hostAccepted", "error"]);
+      this.send({ type: "host", ...details });
+      return accepted;
+    }
+
+    async joinGame(details) {
+      this.roomCode = cleanRoomCode(details.code || this.roomCode);
+      if (!ROOM_CODE_PATTERN.test(this.roomCode)) {
+        throw new Error("Enter a 7-character room code.");
       }
+      await this.connect();
+      const accepted = this.waitFor(["joinAccepted", "error"]);
+      this.send({ type: "join", ...details, code: this.roomCode });
+      return accepted;
+    }
 
-      const result = await response.json();
-      return {
-        success: result.success,
-        message: result.message
-      };
-    } catch (error) {
-      console.error('Failed to start game:', error);
-      throw error;
+    sendInput(input) {
+      this.send({ type: "input", input });
+    }
+
+    sendSnapshot(snapshot) {
+      this.send({ type: "snapshot", snapshot });
+    }
+
+    startMatch() {
+      this.send({ type: "startMatch" });
     }
   }
-}
 
-// Make classes available globally for browser
-if (typeof window !== 'undefined') {
   window.MultiplayerClient = MultiplayerClient;
-  window.MultiplayerAPI = MultiplayerAPI;
-}
-
-// Export for Node.js
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { MultiplayerClient, MultiplayerAPI };
-}
+  window.MultiplayerRoomCode = {
+    clean: cleanRoomCode,
+    isValid(code) {
+      return ROOM_CODE_PATTERN.test(cleanRoomCode(code));
+    }
+  };
+})();
