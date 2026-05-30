@@ -1640,6 +1640,8 @@
       }
     }
 
+  }
+
   // World
   class World {
     constructor(canvas) {
